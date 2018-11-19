@@ -55,8 +55,6 @@
 #include "jz_kgm_spfd5420a.h"
 #endif
 
-#include "bootpic.h"
-
 extern unsigned char *vmfbmem_addr;
 extern u32 phy_vmfbmem_addr;
 static int tvout_640_480 = 0;
@@ -2828,65 +2826,6 @@ static int screen_on_new(void)
 	return 0;
 }
 
-static void screen_open_bootlogo(void)
-{
-	struct lcd_cfb_info *cfb = jz4760fb_info;
-
-	__lcd_display_on();
-
-	int w,h;
-	w = LCD_SCREEN_W;
-	h = LCD_SCREEN_H;
-
-
-	unsigned short*ptr;
-	ptr = (unsigned short*)lcd_frame0;
-	unsigned short*src = l009_bootpic;
-	int i  = 0;
-#if 1
-	for(i = 0 ; i < w*h; i++)
-	{
-		*ptr++ = *src++;
-		//*ptr++ = 0xf800;//rgb red
-	}
-	
-	dma_cache_wback((unsigned int)lcd_frame0, w * h * 2);
-
-	mdelay(300);
-#else
-	for(i = 0 ; i < w*h/3; i++)
-	{
-		*ptr++ = 0xf800;
-	}
-	
-	for(i = 0 ; i < w*h/3; i++)
-	{
-		*ptr++ = 0x07e0;
-	}
-	
-	for(i = 0 ; i < w*h/3; i++)
-	{
-		*ptr++ = 0x001f;
-	}
-	
-	dma_cache_wback((unsigned int)lcd_frame0, w * h * 2);
-	mdelay(300);
-#endif
-
-	/* Really restore LCD backlight when LCD backlight is turned on. */
-	if (cfb->backlight_level) {
-#ifdef HAVE_LCD_PWM_CONTROL
-		if (!cfb->b_lcd_pwm) {
-			__lcd_pwm_start();
-			cfb->b_lcd_pwm = 1;
-		}
-#endif
-		__lcd_set_backlight_level(cfb->backlight_level);
-	}
-
-	cfb->b_lcd_display = 1;
-
-}
 
 static int jz4760fb_set_backlight_level(int n)
 {
@@ -3282,7 +3221,20 @@ static int __devinit jz4760_fb_probe(struct platform_device *dev)
 
 	ctrl_enable();
 
-	screen_open_bootlogo();
+	__lcd_display_on();
+
+	/* Really restore LCD backlight when LCD backlight is turned on. */
+	if (cfb->backlight_level) {
+#ifdef HAVE_LCD_PWM_CONTROL
+		if (!cfb->b_lcd_pwm) {
+			__lcd_pwm_start();
+			cfb->b_lcd_pwm = 1;
+		}
+#endif
+		__lcd_set_backlight_level(cfb->backlight_level);
+	}
+
+	cfb->b_lcd_display = 1;
 
 #ifdef AV_OUT_DETE
         init_timer(&avout_irq_timer);
