@@ -100,6 +100,7 @@ struct jz4760lcd_info {
 #define FBIO_GET_IPU_RESTART_VALUE 0x46a8
 #define FBIOIPUWAIT	0x46a9 /* set back light level */
 #define FBIOIPURERUN	0x46aa /* set back light level */
+#define FBIO_WAITFORVSYNC	_IOW('F', 0x20, __u32)
 
 /*
  * LCD panel specific definition

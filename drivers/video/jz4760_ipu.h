@@ -221,7 +221,7 @@ typedef struct
 #define IN_FMT_YUV422				( 1 << IN_FMT_BIT )
 #define IN_FMT_YUV444				( 2 << IN_FMT_BIT )
 #define IN_FMT_YUV411				( 3 << IN_FMT_BIT )
-#define IN_FMT_PKG_RGB565				( 3 << IN_FMT_BIT )
+#define IN_FMT_PKG_RGB565			( 3 << IN_FMT_BIT )
 
 struct Ration2m
 {

@@ -1359,6 +1359,9 @@ static int jz4760fb_ioctl(struct fb_info *info, unsigned int cmd, unsigned long 
         void __user *argp = (void __user *)arg;
 
 	switch (cmd) {
+	case FBIO_WAITFORVSYNC:
+		printk("FBIO_WAITFORVSYNC");
+		break;
     case FBIOENBALECRTL:
         ctrl_enable();
         break;
@@ -1605,7 +1608,12 @@ static int jz4760fb_check_var(struct fb_var_screeninfo *var, struct fb_info *inf
  */
 static int jz4760fb_set_par(struct fb_info *info)
 {
-	printk("jz4760fb_set_par, not implemented\n");
+	struct myfb_par *par = info->par;
+	printk("YRES_VIRTUAL = %d, YRES = %d\n",info->var.yres_virtual,info->var.yres);
+	if (info->var.yres_virtual != info->var.yres)
+		printk("Required double buffer\n");
+
+	// printk("jz4760fb_set_par, not implemented\n");
 	return 0;
 }
 
@@ -1649,28 +1657,15 @@ static int jz4760fb_blank(int blank_mode, struct fb_info *info)
 static int jz4760fb_pan_display(struct fb_var_screeninfo *var, struct fb_info *info)
 {
 	struct lcd_cfb_info *cfb = (struct lcd_cfb_info *)info;
-	int dy;
 
 	if (!var || !cfb) {
 		return -EINVAL;
 	}
 
-	if (var->xoffset - cfb->fb.var.xoffset) {
-		/* No support for X panning for now! */
-		return -EINVAL;
-	}
-
-	dy = var->yoffset;
-	D("var.yoffset: %d", dy);
-	if (dy) {
-		//dma0_desc0->databuf = (unsigned int)virt_to_phys((void *)lcd_frame0 + (cfb->fb.fix.line_length * dy));
-		//dma_cache_wback((unsigned int)(dma0_desc0), sizeof(struct jz4760_lcd_dma_desc));
-
-	}
-	else {
-		//dma0_desc0->databuf = (unsigned int)virt_to_phys((void *)lcd_frame0);
-		//dma_cache_wback((unsigned int)(dma0_desc0), sizeof(struct jz4760_lcd_dma_desc));
-	}
+	dma0_desc0->databuf = (unsigned int)virt_to_phys((void *)lcd_frame0 + 
+	((var->xoffset * info->var.bits_per_pixel) / 8) +
+	(var->yoffset * cfb->fb.fix.line_length));
+	dma_cache_wback((unsigned int)(dma0_desc0), sizeof(struct jz4760_lcd_dma_desc));
 
 	return 0;
 }
@@ -1973,7 +1968,7 @@ static int jz4760fb_map_smem(struct lcd_cfb_info *cfb)
 	h = ( jz4760_lcd_info->osd.fg0.h > TVE_HEIGHT_PAL )?jz4760_lcd_info->osd.fg0.h:TVE_HEIGHT_PAL;
         printk("%s %d %d \n",__func__,w,h);
 #endif
-	needroom1 = needroom = ((w * bpp + 7) >> 3) * h;
+	needroom1 = needroom = ((w * bpp + 7) >> 3) * h * 3;
 
 #if defined(CONFIG_FB_JZ4760_LCD_USE_2LAYER_FRAMEBUFFER)
 	bpp = bpp_to_data_bpp(jz4760_lcd_info->osd.fg1.bpp);
@@ -1989,7 +1984,7 @@ static int jz4760fb_map_smem(struct lcd_cfb_info *cfb)
 
 #endif
         printk("%s %d %d \n",__func__,w,h);
-	needroom += ((w * bpp + 7) >> 3) * h;
+	needroom += ((w * bpp + 7) >> 3) * h * 3;
 #endif // two layer
 
 	for (page_shift = 0; page_shift < 13; page_shift++)
@@ -1999,9 +1994,9 @@ static int jz4760fb_map_smem(struct lcd_cfb_info *cfb)
 #if defined(CONFIG_JZ4760_HDMI_DISPLAY)
 	page_shift = 11;
 #endif
-	lcd_palette = (unsigned char *)__get_free_pages(GFP_KERNEL, 0);
-	lcd_frame0 = (unsigned char *)__get_free_pages(GFP_KERNEL, page_shift);
-    lcd_frame01 = (unsigned char *)__get_free_pages(GFP_KERNEL, page_shift);
+	lcd_palette = (unsigned char *)__get_free_pages(GFP_KERNEL | GFP_DMA, 0);
+	lcd_frame0 = (unsigned char *)__get_free_pages(GFP_KERNEL | GFP_DMA, page_shift);
+    lcd_frame01 = (unsigned char *)__get_free_pages(GFP_KERNEL | GFP_DMA, page_shift);
 
 	//maddrone add for mplayer trans fb
 	vmfbmem_addr = lcd_frame01;
@@ -2259,7 +2254,7 @@ static void jz4760fb_descriptor_init( struct jz4760lcd_info * lcd_info )
 		dma0_desc0->databuf = virt_to_phys((void *)lcd_frame0);
 		dma0_desc0->frame_id = (unsigned int)0x0000da00; /* DMA0'0 */
 	
-		frame_size0 = (LCD_SCREEN_W * LCD_SCREEN_H* 16) >> 3;
+		frame_size0 = (LCD_SCREEN_W * LCD_SCREEN_H * 16) >> 3;
 		frame_size0 /= 4;
 		dma0_desc0->cmd = frame_size0;
 		dma0_desc0->desc_size = (LCD_SCREEN_H << 16) | LCD_SCREEN_W;
@@ -3222,6 +3217,10 @@ static int __devinit jz4760_fb_probe(struct platform_device *dev)
 	ctrl_enable();
 
 	__lcd_display_on();
+	//fill black
+	memset(lcd_frame0, 0x00, LCD_SCREEN_W * LCD_SCREEN_W * 2);
+	dma_cache_wback((unsigned int)lcd_frame0, LCD_SCREEN_W * LCD_SCREEN_W * 2);
+	mdelay(50);	//needed to avoid flash white screen
 
 	/* Really restore LCD backlight when LCD backlight is turned on. */
 	if (cfb->backlight_level) {
