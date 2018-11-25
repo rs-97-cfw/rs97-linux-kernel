@@ -230,7 +230,7 @@ static struct task_struct * battery_monitor;
 
 #define POWEROFF_VOL 3550 //3620
 extern int jz_pm_hibernate(void);
-extern void run_sbin_poweroff();
+// extern void run_sbin_poweroff();
 
 static void battery_track_timer(unsigned long data)
 {
@@ -266,7 +266,7 @@ static void battery_track_timer(unsigned long data)
 				if(!__gpio_get_pin(OTG_HOTPLUG_PIN))
 				{
 					printk("the power is too low do hibernate!!!!!\n");
-					run_sbin_poweroff();
+					// run_sbin_poweroff();
 					jz_pm_hibernate();
 				}
 				printk("------- %s %d \n",__func__,__LINE__);

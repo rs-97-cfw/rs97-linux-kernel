@@ -2,7 +2,7 @@
 # Makefile for jzchar
 #
 #obj-$(CONFIG_JZCHAR)		+= jzchars.o
-obj-$(CONFIG_JZCHAR)		+= jzchars.o poweroff.o simulate_i2c.o sensor.o gsensor_i2c.o
+obj-$(CONFIG_JZCHAR)		+= jzchars.o simulate_i2c.o sensor.o gsensor_i2c.o backlight.o
 
 #obj-$(CONFIG_JZ_TPANEL)		+= jz_ts.o
 obj-$(CONFIG_JZ_TPANEL_UCB1400)	+= ucb1400.o
