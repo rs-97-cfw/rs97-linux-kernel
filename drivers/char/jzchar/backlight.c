@@ -3,8 +3,6 @@
  *
  * Backlight handling.
  *
- * Copyright (C) 2005-2007  Ingenic Semiconductor Inc.
- *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
  * Free Software Foundation; either version 2 of the License, or (at your
@@ -23,7 +21,6 @@
 #include <linux/fs.h>
 #include <linux/spinlock.h>
 #include <linux/pm.h>
-//#include <linux/pm_legacy.h>
 #include <linux/proc_fs.h>
 
 #include <asm/io.h>
@@ -49,10 +46,10 @@ int backlightButton = BTN_NONE;
 int backlightLevel = 65;
 long disable = 0;
 
-static void process_button(int* button, bool onStatus)
+static void process_button(int* button,uint gpio_pin, bool onStatus)
 {
 			//LED 0是按下,1是沒按
-		if (__gpio_get_pin(UMIDO_KEY_LED) == onStatus)
+		if (__gpio_get_pin(gpio_pin) == onStatus)
 		{
 			switch(backlightButton)
 			{
@@ -90,7 +87,7 @@ static int backlight_control_thread(void *unused)
 	{
 		if (!disable)
 		{
-			process_button(&backlightButton, 0);
+			process_button(&backlightButton,UMIDO_KEY_LED, 0);
 			if (backlightButton == BTN_PRESSED)
 			{
 				backlightLevel += 20;

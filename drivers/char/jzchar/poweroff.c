@@ -66,8 +66,8 @@ MODULE_LICENSE("GPL");
 #endif
 
 
-#define POWEROFF_PERIOD         1000    /* unit: ms */
-#define POWEROFF_DELAY          100     /* unit: ms */
+#define POWEROFF_PERIOD         10000    /* unit: ms */
+#define POWEROFF_DELAY          1000     /* unit: ms */
 //KJH ADD 
 static struct task_struct *poweroff_task;
 static struct timer_list poweroff_timer;
@@ -88,52 +88,6 @@ extern int jz_pm_hibernate(void);
 extern int jz_pm_sleep(void);
 
 extern unsigned int medive_flag;
-
-void run_sbin_poweroff()
-{
-	int i;
-	char *argv[3], *envp[8];
-    int ret;
-    
-    i = 0;
-    argv[i++] = "/boot/local/sbin/ne_inform";
-    //argv[i++] = "/boot/local/sbin/ne_inform.sh";
-    //argv[i++] = "/usr/bin/udc_connect.sh";
-
-    argv[i++] = "poweroff";
-
-    argv[i] = 0;
-
-    /* minimal command environment */
-    i = 0;
-    envp[i++] = "HOME=/";
-    envp[i++] = "PATH=/sbin:/bin:/usr/sbin:/usr/bin:/boot/local/sbin";
-
-    envp[i] = 0;
-	
-    printk("---- %s %d \n",__func__,__LINE__);
-    ret = call_usermodehelper (argv[0], argv, envp, -1);
-    if(ret != 0)
-    {
-	    printk("call user helper error, errno = %d\n",ret);
-	    SET_POWEROFF_PIN_AS_IRQ;
-	    __gpio_unmask_irq(POWEROFF_PIN);
-	    return;
-    }
-    else
-    {
-	    printk("%s %d  %s call user helper ok..!\n",__FILE__,__LINE__,argv[0]);
-    }
-	
-	__lcd_set_backlight_level(60); //allen add to draw off os picture
-	
-    msleep(5*1000);
-    printk("\n Medive pintk: rerun jz pm hibernate!\n");
-    msleep(10*1000);
-
-    //jz_pm_hibernate();
-}
-EXPORT_SYMBOL(run_sbin_poweroff);
 
 
 static void poweroff_timer_routine(unsigned long dummy)
@@ -419,7 +373,8 @@ static int poweroff_thread(void *unused)
 		set_current_state(TASK_UNINTERRUPTIBLE);
 		schedule();
 		printk("poweroff wakeup\n");
-		run_sbin_poweroff();
+		jz_pm_hibernate();
+
 	}
 }
 
