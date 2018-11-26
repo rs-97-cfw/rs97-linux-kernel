@@ -213,7 +213,7 @@ struct jz4760lcd_info jz4760_lcd_panel = {
 	 },
 
 #elif defined(CONFIG_JZ4760_LCD_TM370_LN430_9)
- #if 0 //auo-8 and ILI8965
+ #if 1 //auo-8 and ILI8965
     .panel = {
 		.cfg = LCD_CFG_LCDPIN_LCD | LCD_CFG_RECOVER | /* Underrun recover */
 			   LCD_CFG_MODE_SERIAL_TFT | /* General TFT panel */
@@ -223,8 +223,8 @@ struct jz4760lcd_info jz4760_lcd_panel = {
 
 		.slcd_cfg = 0,
 		.ctrl = LCD_CTRL_OFUM | LCD_CTRL_BST_16,	/* 16words burst, enable out FIFO underrun irq */
-		 //320, 480, 60, 20, 1, 48, 40, 18,27, //auo
-		 320, 480, 120, 20, 1, 48, 40, 10,42,  //ILI8965
+		320, 480,  60, 20, 1, 48, 40, 18,27, //auo
+		//320, 480, 120, 20, 1, 48, 40, 10,42,  //ILI8965
 	},
 
 	.osd = {
@@ -233,7 +233,7 @@ struct jz4760lcd_info jz4760_lcd_panel = {
 		 //LCD_OSDC_F1EN |	/* enable Foreground0 */
 		 LCD_OSDC_F0EN, /* enable Foreground0 */
 		 .osd_ctrl = 0, 	/* disable ipu,  */
-		 .rgb_ctrl = 0x30,
+		 .rgb_ctrl = LCD_RGBC_EVEN_GBR << LCD_RGBC_EVENRGB_BIT,
 		 .bgcolor = 0x000000, /* set background color Black */
 		 .colorkey0 = 0x80000000, /* disable colorkey */
 		 .colorkey1 = 0x80000000, /* disable colorkey */
@@ -261,7 +261,7 @@ struct jz4760lcd_info jz4760_lcd_panel = {
 			//LCD_OSDC_F1EN |  /* enable Foreground0 */
 			LCD_OSDC_F0EN, /* enable Foreground0 */
 			.osd_ctrl = 0,	   /* disable ipu,	*/
-			.rgb_ctrl = 0x0,
+			.rgb_ctrl = LCD_RGBC_EVEN_GBR << LCD_RGBC_EVENRGB_BIT,
 			.bgcolor = 0x000000, /* set background color Black */
 			.colorkey0 = 0x80000000, /* disable colorkey */
 			.colorkey1 = 0x80000000, /* disable colorkey */
@@ -3218,10 +3218,34 @@ static int __devinit jz4760_fb_probe(struct platform_device *dev)
 
 	__lcd_display_on();
 	//fill black
+#if (RGB_TEST)
+	int i = 0;
+	unsigned short*ptr;
+	ptr = (unsigned short*)lcd_frame0;
+
+	for(i = 0 ; i < LCD_SCREEN_W*LCD_SCREEN_H/3; i++)
+	{
+		*ptr++ = 0xf800;
+	}
+	
+	for(i = 0 ; i < LCD_SCREEN_W*LCD_SCREEN_H/3; i++)
+	{
+		*ptr++ = 0x07e0;
+	}
+	
+	for(i = 0 ; i < LCD_SCREEN_W*LCD_SCREEN_H/3; i++)
+	{
+		*ptr++ = 0x001f;
+	}
+	
+	dma_cache_wback((unsigned int)lcd_frame0, LCD_SCREEN_W * LCD_SCREEN_H * 2);
+	mdelay(3000);
+#else
 	memset(lcd_frame0, 0x00, LCD_SCREEN_W * LCD_SCREEN_W * 2);
 	dma_cache_wback((unsigned int)lcd_frame0, LCD_SCREEN_W * LCD_SCREEN_W * 2);
 	mdelay(50);	//needed to avoid flash white screen
 
+#endif
 	/* Really restore LCD backlight when LCD backlight is turned on. */
 	if (cfb->backlight_level) {
 #ifdef HAVE_LCD_PWM_CONTROL

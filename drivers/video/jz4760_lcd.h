@@ -726,8 +726,8 @@ do { \
 	__gpio_set_pin(LCD_RET);		\
  }while (0)
 
-#if 0 //auo-8
-#if 0 //auo
+#if 1 //auo-8
+#if 1 //auo
 #define __lcd_special_on()   \
  do { \
  	printk("\n auo-3.0lcd ... \n");\
@@ -793,7 +793,7 @@ do { \
 	__spi_writ_bit16(0x05, 0x5C); \
 	__spi_writ_bit16(0x02, 0x14); \
 	__spi_writ_bit16(0x03, 0x40); \
-	__spi_writ_bit16(0x04, 0x2b); /*0x2b*/\
+	__spi_writ_bit16(0x04, 0x0b); /*0x2b*/\
 	__spi_writ_bit16(0x06, 0x1B); \
 	__spi_writ_bit16(0x07, 0x28); \
 	__spi_writ_bit16(0x0C, 0x06); \
