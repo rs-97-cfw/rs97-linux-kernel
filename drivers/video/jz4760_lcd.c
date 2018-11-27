@@ -228,6 +228,7 @@ struct jz4760lcd_info jz4760_lcd_panel = {
 		320, 480, 120, 20, 1, 48, 40, 10, 42,  //ILI8965
 #elif defined(RS97_INNOLUX)
 		320, 480, 120, 20, 1, 32, 40, 17, 27,	//INNOLUX
+#endif
 	},
 
 	.osd = {

@@ -13,8 +13,9 @@
 #define __JZ4760_LCD_H__
 
 //#include <asm/io.h>
-
-
+//#define RS97_AUO
+#define RS97_INNOLUX
+//#define RS97_WEIRDSHIT
 #define NR_PALETTE	256
 #define PALETTE_SIZE	(NR_PALETTE*2)
 
