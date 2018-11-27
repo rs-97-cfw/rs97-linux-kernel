@@ -726,8 +726,7 @@ do { \
 	__gpio_set_pin(LCD_RET);		\
  }while (0)
 
-#if 1 //auo-8
-#if 1 //auo
+#if defined(RS97_AUO)
 #define __lcd_special_on()   \
  do { \
  	printk("\n auo-3.0lcd ... \n");\
@@ -737,7 +736,7 @@ do { \
 	 __spi_writ_bit16(0x05,0x75); \
 	 mdelay(10);\
  } while (0) 
-#else //ILI8965
+#elif defined(RS97_WEIRDSHIT) //ILI8965
 
 #define __lcd_special_on()   \
  do { \
@@ -783,9 +782,8 @@ __spi_writ_bit16(0x32, 0x28); \
 __spi_writ_bit16(0x33, 0x23);  \
 __spi_writ_bit16(0x34, 0x06); \
  } while (0) 
- #endif //auo-8 end
  
-#else 
+#elif defined(RS97_INNOLUX) 
 #define __lcd_special_on()   \
 do { \
 	printk("\n EJ027NA-3.0lcd ... \n");\

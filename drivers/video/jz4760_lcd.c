@@ -213,18 +213,21 @@ struct jz4760lcd_info jz4760_lcd_panel = {
 	 },
 
 #elif defined(CONFIG_JZ4760_LCD_TM370_LN430_9)
- #if 1 //auo-8 and ILI8965
     .panel = {
-		.cfg = LCD_CFG_LCDPIN_LCD | LCD_CFG_RECOVER | /* Underrun recover */
+		.cfg = LCD_CFG_LCDPIN_LCD | LCD_CFG_RECOVER | /* Underrun recover */ 
 			   LCD_CFG_MODE_SERIAL_TFT | /* General TFT panel */
-			   LCD_CFG_MODE_TFT_16BIT |	/* output 18bpp */
+			   LCD_CFG_MODE_TFT_16BIT |
 			   LCD_CFG_PCP |
-			   LCD_CFG_NEWDES,
+			   LCD_CFG_NEWDES, /* 8words descriptor */
 
 		.slcd_cfg = 0,
 		.ctrl = LCD_CTRL_OFUM | LCD_CTRL_BST_16,	/* 16words burst, enable out FIFO underrun irq */
+#if defined(RS97_AUO)
 		320, 480,  60, 20, 1, 48, 40, 18,27, //auo
-		//320, 480, 120, 20, 1, 48, 40, 10,42,  //ILI8965
+#elif defined(RS97_WEIRDSHIT)
+		320, 480, 120, 20, 1, 48, 40, 10, 42,  //ILI8965
+#elif defined(RS97_INNOLUX)
+		320, 480, 120, 20, 1, 32, 40, 17, 27,	//INNOLUX
 	},
 
 	.osd = {
@@ -243,36 +246,6 @@ struct jz4760lcd_info jz4760_lcd_panel = {
 		 .fg0 = {16, 0, 0, 320,480}, /* bpp, x, y, w, h */
 		 .fg1 = {16, 0, 0, 320,480}, /* bpp, x, y, w, h */
 	 },
- #else
- 	.panel = {
-		   .cfg = LCD_CFG_LCDPIN_LCD | LCD_CFG_RECOVER | /* Underrun recover */ 
-		   LCD_CFG_NEWDES | /* 8words descriptor */
-		   LCD_CFG_MODE_SERIAL_TFT | /* LCD_CFG_MODE_SERIAL_TFT */
-		   LCD_CFG_PCP |
-		   LCD_CFG_MODE_TFT_16BIT,
-	
-		   .slcd_cfg = 0,
-		   .ctrl = LCD_CTRL_OFUM | LCD_CTRL_BST_16,    /* 16words burst, enable out FIFO underrun irq */
-		   320,480, 120, 20, 1, 32,40, 17, 27,
-	   },
-	   .osd = {
-			.osd_cfg = LCD_OSDC_OSDEN | /* Use OSD mode */
-			//LCD_OSDC_ALPHAEN | /* enable alpha */
-			//LCD_OSDC_F1EN |  /* enable Foreground0 */
-			LCD_OSDC_F0EN, /* enable Foreground0 */
-			.osd_ctrl = 0,	   /* disable ipu,	*/
-			.rgb_ctrl = LCD_RGBC_EVEN_GBR << LCD_RGBC_EVENRGB_BIT,
-			.bgcolor = 0x000000, /* set background color Black */
-			.colorkey0 = 0x80000000, /* disable colorkey */
-			.colorkey1 = 0x80000000, /* disable colorkey */
-			.alpha = 0xa0, /* alpha value */
-			.ipu_restart = 0x80001000, /* ipu restart */
-			.fg_change = FG_CHANGE_ALL, /* change all initially */
-			.fg0 = {16, 0, 0, 320, 480}, /* bpp, x, y, w, h */
-			.fg1 = {16, 0, 0, 320, 480}, /* bpp, x, y, w, h */
-		},
-	
- #endif
  
 #elif defined(CONFIG_JZ4760_LCD_TRULY_TFT_GG1P0319LTSW_W)
 	.panel = {

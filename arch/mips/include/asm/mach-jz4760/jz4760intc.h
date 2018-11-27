@@ -90,7 +90,7 @@
 #define IRQ_BDMA_0  (IRQ_DMA_0 + MAX_DMA_NUM + MAX_MDMA_NUM) /* 61 ~ 63 for BDMA channel 0 ~ 2 */
 
 //#define IRQ_GPIO_0	96  /* 96 to 287 for GPIO pin 0 to 127 */
-#define IRQ_GPIO_0	64  /* 96 to 287 for GPIO pin 0 to 127 */
+#define IRQ_GPIO_0	64  /* 64 to 191 for GPIO pin 0 to 127 */
 
 #define NUM_INTC	41
 #define NUM_DMA         MAX_DMA_NUM	/* 12 */
