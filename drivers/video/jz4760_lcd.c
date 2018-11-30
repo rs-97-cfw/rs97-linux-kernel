@@ -237,7 +237,12 @@ struct jz4760lcd_info jz4760_lcd_panel = {
 		 //LCD_OSDC_F1EN |	/* enable Foreground0 */
 		 LCD_OSDC_F0EN, /* enable Foreground0 */
 		 .osd_ctrl = 0, 	/* disable ipu,  */
+#if defined(RS97_WEIRDSHIT)
+		 .rgb_ctrl = LCD_RGBC_ODD_GBR << LCD_RGBC_ODDRGB_BIT,
+
+#else		 
 		 .rgb_ctrl = LCD_RGBC_EVEN_GBR << LCD_RGBC_EVENRGB_BIT,
+#endif
 		 .bgcolor = 0x000000, /* set background color Black */
 		 .colorkey0 = 0x80000000, /* disable colorkey */
 		 .colorkey1 = 0x80000000, /* disable colorkey */
@@ -3050,7 +3055,7 @@ void avout_ack_timer(unsigned long data)
 		jz4760fb_deep_set_mode(jz4760_lcd_info);
 		//fb_resize_start();
 
-		ipu_driver_open_tv(LCD_SCREEN_W,LCD_SCREEN_H,640,480);
+		ipu_driver_open_tv(320,240,320,480);
 
 
 		printk("1231\n");
@@ -3192,7 +3197,7 @@ static int __devinit jz4760_fb_probe(struct platform_device *dev)
 
 	__lcd_display_on();
 	//fill black
-#if (RGB_TEST)
+#if defined(RGB_TEST)
 	int i = 0;
 	unsigned short*ptr;
 	ptr = (unsigned short*)lcd_frame0;
