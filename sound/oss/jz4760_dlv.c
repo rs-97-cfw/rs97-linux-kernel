@@ -960,13 +960,13 @@ static void dlv_disable_btl(void)
  * Enable SPERKER replay mode
  *
  */
-extern unsigned int panle_mode;
+// extern unsigned int panle_mode;
 extern unsigned int l009_globle_volume;
 static void dlv_enable_speaker(void)
 {
 #ifdef  HP_POWER_EN
 //	dlv_enable_btl();
-	if (!panle_mode && l009_globle_volume > 0){
+	if (/*!panle_mode &&*/ l009_globle_volume > 0){
 		__gpio_as_func0(HP_POWER_EN);
 		__gpio_as_output(HP_POWER_EN);
 		__gpio_enable_pull(HP_POWER_EN);

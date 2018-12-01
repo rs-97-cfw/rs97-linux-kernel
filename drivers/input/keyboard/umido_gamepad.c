@@ -68,7 +68,7 @@ static int key_release(struct inode *inode, struct file *filp)
 
 extern unsigned int jz_read_key_handle();
 
-extern void fb_resize_start();
+// extern void fb_resize_start();
 static int other_key_value = 0;
 void umido_gamepad_set_key_value(int value,char joystick)
 {
@@ -134,7 +134,7 @@ static ssize_t key_read(struct file *filp, char __user *buf, size_t count, loff_
 	//if(key_value)
 	//	printk("key value is 0x%x\n",key_value);
 	
-	fb_resize_start();
+	//fb_resize_start();
   	copy_to_user(buf, &key_value, sizeof(int));
   	return sizeof(int);
 }

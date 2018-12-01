@@ -1,7 +1,7 @@
 /*
  * linux/drivers/video/jz4760_lcd.c -- Ingenic Jz4760 LCD frame buffer device
  *
- * Copyright (C) 2005-2012, Ingenic Semiconductor Inc.
+ * Copyright (C) 2005-2008, Ingenic Semiconductor Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -35,8 +35,6 @@
 #include <linux/dma-mapping.h>
 #include <linux/platform_device.h>
 #include <linux/pm.h>
-#include <linux/proc_fs.h>
-#include <linux/kthread.h>
 
 #include <asm/irq.h>
 #include <asm/pgtable.h>
@@ -50,51 +48,19 @@
 #include "jz4760_lcd.h"
 #include "jz4760_tve.h"
 
-
 #ifdef CONFIG_JZ4760_SLCD_KGM701A3_TFT_SPFD5420A
 #include "jz_kgm_spfd5420a.h"
 #endif
 
-extern unsigned char *vmfbmem_addr;
-extern u32 phy_vmfbmem_addr;
-static int tvout_640_480 = 0;
+MODULE_DESCRIPTION("Jz4760 LCD Controller driver");
+MODULE_AUTHOR("Wolfgang Wang, <lgwang@ingenic.cn>");
+MODULE_LICENSE("GPL");
 
-//0: lcd   1 : 480X272->640X480    2:640X480
-static unsigned int tvout_flag  = 0;
-
-static unsigned int backlight_value = 80;
-static int thread_init_end = 0;
-static int resize_go_out = 0;
-static int tvout_display_w = 320;
-static int tvout_display_h = 240;
-unsigned char *lcd_frame0,*lcd_frame01,*lcd_frame0_ipu_src;
-#define TVOUT_2x
-
-static unsigned int lcd_flush_flag = 1;
-unsigned int panle_mode = 0;
-static unsigned int tvout_flag2 = 0;
-static unsigned int lcd_a320_flag = 0;
-static struct timer_list avout_irq_timer;
-static struct timer_list hdmi_irq_timer;
-int panel_mode = PANEL_MODE_LCD_PANEL;
-static int last_panel_mode = PANEL_MODE_LCD_PANEL;
-
-extern unsigned int l009_globle_volume;
-
-extern void ipu_driver_close_tv(void);
-extern void ipu_driver_open_tv(int,int,int,int);
-extern void ipu_driver_flush_tv(void);
-extern void ipu_driver_wait_end();
-
-static void fb_resize_a320_original_start();
-static void fb_resize_a320_fullscreen_start();
-
-#if 1
-#define D(fmt, args...)
-#else
 #define D(fmt, args...) \
-	printk(KERN_INFO "%s(): "fmt"\n", __func__, ##args)
-#endif
+//	printk(KERN_ERR "%s(): "fmt"\n", __func__, ##args)
+
+#define E(fmt, args...) \
+	printk(KERN_ERR "%s(): "fmt"\n", __func__, ##args)
 
 #define JZ_FB_DEBUG 0
 static int lcd_backlight_level = 102;
@@ -163,7 +129,7 @@ struct jz4760lcd_info jz4760_lcd_panel = {
 		LCD_CFG_HSP | 	/* Hsync polarity: active low */
 		LCD_CFG_VSP,	/* Vsync polarity: leading edge is falling edge */
 		.slcd_cfg = 0,
-		.ctrl = LCD_CTRL_OFUM | LCD_CTRL_BST_64,	/* 16words burst, enable out FIFO underrun irq */
+		.ctrl = LCD_CTRL_OFUM | LCD_CTRL_BST_16,	/* 16words burst, enable out FIFO underrun irq */
 		800, 480, 60, 1, 1, 40, 215, 10, 34,
 	},
 	.osd = {
@@ -173,7 +139,7 @@ struct jz4760lcd_info jz4760_lcd_panel = {
 		 LCD_OSDC_F0EN,	/* enable Foreground0 */
 		 .osd_ctrl = 0,		/* disable ipu,  */
 		 .rgb_ctrl = 0,
-		 .bgcolor = 0x0, /* set background color Black */
+		 .bgcolor = 0xff, /* set background color Black */
 		 .colorkey0 = 0, /* disable colorkey */
 		 .colorkey1 = 0, /* disable colorkey */
 		 .alpha = 0xA0,	/* alpha value */
@@ -182,77 +148,6 @@ struct jz4760lcd_info jz4760_lcd_panel = {
 		 .fg0 = {32, 0, 0, 800, 480}, /* bpp, x, y, w, h */
 		 .fg1 = {32, 0, 0, 800, 480}, /* bpp, x, y, w, h */
 	 },
-#elif defined(CONFIG_JZ4760_LCD_UMIDO_L430)
-	.panel = {
-		.cfg = LCD_CFG_LCDPIN_LCD | LCD_CFG_RECOVER | /* Underrun recover */
-		LCD_CFG_NEWDES | /* 8words descriptor */
-		LCD_CFG_MODE_GENERIC_TFT | /* Serial TFT panel */
-		LCD_CFG_MODE_TFT_24BIT | 	/* output 24bpp */
-		LCD_CFG_HSP | 	/* Hsync polarity: active low */
-		LCD_CFG_VSP ,	/* Vsync polarity: leading edge is falling edge */
-		.slcd_cfg = 0,
-		.ctrl = LCD_CTRL_OFUM | LCD_CTRL_BST_16,	/* 16words burst, enable out FIFO underrun irq */
-                //480, 272,  100, 1, 1, 40, 215, 0, 45,
-                480, 272,  60, 41, 10, 2, 2, 2, 2,
-	},
-	.osd = {
-		 .osd_cfg = LCD_OSDC_OSDEN | /* Use OSD mode */
-		 //LCD_OSDC_ALPHAEN | /* enable alpha */
-		 //LCD_OSDC_F1EN |	/* enable Foreground0 */
-		 LCD_OSDC_F0EN,	/* enable Foreground0 */
-		 .osd_ctrl = 0,		/* disable ipu,  */
-		 .rgb_ctrl = 0,
-		 .bgcolor = 0x000000, /* set background color Black */
-		 .colorkey0 = 0x80000000, /* disable colorkey */
-		 .colorkey1 = 0x80000000, /* disable colorkey */
-		 .alpha = 0xa0,	/* alpha value */
-		 .ipu_restart = 0x80001000, /* ipu restart */
-		 .fg_change = FG_CHANGE_ALL, /* change all initially */
-		 .fg0 = {16, 0, 0, 480, 272}, /* bpp, x, y, w, h */
-		 .fg1 = {16, 0, 0, 480, 272}, /* bpp, x, y, w, h */
-	 },
-
-#elif defined(CONFIG_JZ4760_LCD_TM370_LN430_9)
-    .panel = {
-		.cfg = LCD_CFG_LCDPIN_LCD | LCD_CFG_RECOVER | /* Underrun recover */ 
-			   LCD_CFG_MODE_SERIAL_TFT | /* General TFT panel */
-			   LCD_CFG_MODE_TFT_16BIT |
-			   LCD_CFG_PCP |
-			   LCD_CFG_NEWDES, /* 8words descriptor */
-
-		.slcd_cfg = 0,
-		.ctrl = LCD_CTRL_OFUM | LCD_CTRL_BST_16,	/* 16words burst, enable out FIFO underrun irq */
-#if defined(RS97_AUO)
-		320, 480,  60, 20, 1, 48, 40, 18,27, //auo
-#elif defined(RS97_WEIRDSHIT)
-		320, 480, 120, 20, 1, 48, 40, 10, 42,  //ILI8965
-#elif defined(RS97_INNOLUX)
-		320, 480, 120, 20, 1, 32, 40, 17, 27,	//INNOLUX
-#endif
-	},
-
-	.osd = {
-		 .osd_cfg = LCD_OSDC_OSDEN | /* Use OSD mode */
-		 //LCD_OSDC_ALPHAEN | /* enable alpha */
-		 //LCD_OSDC_F1EN |	/* enable Foreground0 */
-		 LCD_OSDC_F0EN, /* enable Foreground0 */
-		 .osd_ctrl = 0, 	/* disable ipu,  */
-#if defined(RS97_WEIRDSHIT)
-		 .rgb_ctrl = LCD_RGBC_ODD_GBR << LCD_RGBC_ODDRGB_BIT,
-
-#else		 
-		 .rgb_ctrl = LCD_RGBC_EVEN_GBR << LCD_RGBC_EVENRGB_BIT,
-#endif
-		 .bgcolor = 0x000000, /* set background color Black */
-		 .colorkey0 = 0x80000000, /* disable colorkey */
-		 .colorkey1 = 0x80000000, /* disable colorkey */
-		 .alpha = 0xa0, /* alpha value */
-		 .ipu_restart = 0x80001000, /* ipu restart */
-		 .fg_change = FG_CHANGE_ALL, /* change all initially */
-		 .fg0 = {16, 0, 0, 320,480}, /* bpp, x, y, w, h */
-		 .fg1 = {16, 0, 0, 320,480}, /* bpp, x, y, w, h */
-	 },
- 
 #elif defined(CONFIG_JZ4760_LCD_TRULY_TFT_GG1P0319LTSW_W)
 	.panel = {
 		 .cfg = LCD_CFG_LCDPIN_SLCD | /* Underrun recover*/
@@ -366,7 +261,7 @@ struct jz4760lcd_info jz4760_lcd_panel = {
 		 .fg0 = {32, 0, 0, 320, 240}, /* bpp, x, y, w, h */
 		 .fg1 = {32, 0, 0, 400, 240}, /* bpp, x, y, w, h */
 	 },
-#elif defined(CONFIG_JZ_VGA_DISPLAY_DEFAULT)
+#elif defined(CONFIG_JZ4760_VGA_DISPLAY)
 	.panel = {
 		.cfg = LCD_CFG_LCDPIN_LCD | LCD_CFG_RECOVER |/* Underrun recover */
 		LCD_CFG_NEWDES | /* 8words descriptor */
@@ -376,10 +271,9 @@ struct jz4760lcd_info jz4760_lcd_panel = {
 		LCD_CFG_VSP,	/* Vsync polarity: leading edge is falling edge */
 		.slcd_cfg = 0,
 		.ctrl = LCD_CTRL_OFUM | LCD_CTRL_BST_16,	/* 16words burst, enable out FIFO underrun irq */
-		800, 600, 60, 128, 4, 40, 88, 1, 23
-//		640, 480, 60, 96, 2, 16, 48, 10, 33
+//		800, 600, 60, 128, 4, 40, 88, 0, 23
+		640, 480, 54, 96, 2, 16, 48, 10, 33
 //		1280, 720, 50, 152, 15, 22, 200, 14, 1
-//		1024, 768, 62, 136, 6, 24, 160, 3, 29
 	},
 	.osd = {
 		 .osd_cfg = LCD_OSDC_OSDEN | /* Use OSD mode */
@@ -397,130 +291,95 @@ struct jz4760lcd_info jz4760_lcd_panel = {
 		 .fg0 = {32, 0, 0, 640, 480}, /* bpp, x, y, w, h */
 		 .fg1 = {32, 0, 0, 640, 480}, /* bpp, x, y, w, h */
 	 },
-#elif defined(CONFIG_JZ_VGA_DISPLAY_1024x768_60)
-	.panel = {
-		.cfg = LCD_CFG_LCDPIN_LCD | LCD_CFG_RECOVER |/* Underrun recover */
-		LCD_CFG_NEWDES | /* 8words descriptor */
-		LCD_CFG_MODE_GENERIC_TFT | /* General TFT panel */
-		LCD_CFG_MODE_TFT_24BIT | 	/* output 18bpp */
-		LCD_CFG_HSP | 	/* Hsync polarity: active low */
-		LCD_CFG_VSP,	/* Vsync polarity: leading edge is falling edge */
+#elif defined(CONFIG_JZ4760_LCD_RS97_V10)
+    .panel = {
+		.cfg = LCD_CFG_LCDPIN_LCD | LCD_CFG_RECOVER | /* Underrun recover */ 
+			   LCD_CFG_MODE_SERIAL_TFT | /* General TFT panel */
+			   LCD_CFG_MODE_TFT_16BIT |
+			   LCD_CFG_PCP |
+			   LCD_CFG_NEWDES, /* 8words descriptor */
+
 		.slcd_cfg = 0,
-//		.ctrl = LCD_CTRL_OFUM | LCD_CTRL_BST_16,	/* 16words burst, enable out FIFO underrun irq */
-		.ctrl = LCD_CTRL_OFUM | LCD_CTRL_BST_64,
-//		1024, 768, 62, 136, 6, 24, 160, 3, 29
-		1024, 768, 60, 136, 6, 24, 160, 3, 29
+		.ctrl = LCD_CTRL_OFUM | LCD_CTRL_BST_16,	/* 16words burst, enable out FIFO underrun irq */
+		320, 480,  60, 20, 1, 48, 40, 18,27, //auo
 	},
+
 	.osd = {
 		 .osd_cfg = LCD_OSDC_OSDEN | /* Use OSD mode */
-//		 LCD_OSDC_ALPHAEN | /* enable alpha */
-//		 LCD_OSDC_F1EN | /* enable Foreground1 */
-		 LCD_OSDC_F0EN,	/* enable Foreground0 */
-		 .osd_ctrl = 0,		/* disable ipu,  */
-		 .rgb_ctrl = 0,
+		 //LCD_OSDC_ALPHAEN | /* enable alpha */
+		 //LCD_OSDC_F1EN |	/* enable Foreground0 */
+		 LCD_OSDC_F0EN, /* enable Foreground0 */
+		 .osd_ctrl = 0, 	/* disable ipu,  */
+		 .rgb_ctrl = LCD_RGBC_EVEN_GBR << LCD_RGBC_EVENRGB_BIT,
 		 .bgcolor = 0x000000, /* set background color Black */
-		 .colorkey0 = 0, /* disable colorkey */
-		 .colorkey1 = 0, /* disable colorkey */
-		 .alpha = 0xA0,	/* alpha value */
+		 .colorkey0 = 0x80000000, /* disable colorkey */
+		 .colorkey1 = 0x80000000, /* disable colorkey */
+		 .alpha = 0xa0, /* alpha value */
 		 .ipu_restart = 0x80001000, /* ipu restart */
 		 .fg_change = FG_CHANGE_ALL, /* change all initially */
-//		 .fg0 = {32, 224/2, 288/2, (1024-224), (768-288)}, /* bpp, x, y, w, h */
-//		 .fg1 = {32, 224/2, 288/2, (1024-224), (768-288)}, /* bpp, x, y, w, h */
-//		 .fg0 = {32, 224/2, 168/2, (1024-224), (768-168)}, /* bpp, x, y, w, h */
-//		 .fg1 = {32, 224/2, 168/2, (1024-224), (768-168)}, /* bpp, x, y, w, h */
-		 .fg0 = {32, 16/2, 12/2, (1024-16), (768-12)}, /* bpp, x, y, w, h */
-		 .fg1 = {32, 16/2, 12/2, (1024-16), (768-12)}, /* bpp, x, y, w, h */
+		 .fg0 = {16, 0, 0, 320,480}, /* bpp, x, y, w, h */
+		 .fg1 = {16, 0, 0, 320,480}, /* bpp, x, y, w, h */
 	 },
-#elif defined(CONFIG_JZ4760_LCD_HYNIX_HT12X14)
-	.panel = {
-		.cfg = LCD_CFG_LCDPIN_LCD | LCD_CFG_RECOVER | /* Underrun recover */ 
-		LCD_CFG_NEWDES | /* 8words descriptor */
-		LCD_CFG_MODE_GENERIC_TFT | /* General TFT panel */
-		LCD_CFG_MODE_TFT_18BIT|(0<<9)|	/* output 16bpp */
-		LCD_CFG_PCP |	/* PCLK polarity: the falling edge acts as data strobe*/
-		LCD_CFG_HSP |	/* Hsync polarity: active low */
-		LCD_CFG_VSP,	/* Vsync polarity: leading edge is falling edge */
-		.slcd_cfg = 0,
-		.ctrl = LCD_CTRL_OFUM | LCD_CTRL_BST_64,	/* 16words burst, enable out FIFO underrun irq */
-		//  width,height,freq,hsync,vsync,elw,blw,efw,bfw         
-		1024, 768, 65, 1, 1, 75, 0, 3, 0,
-	},
-	.osd = {
-		 .osd_cfg = LCD_OSDC_OSDEN | /* Use OSD mode */
-		 LCD_OSDC_ALPHAEN | /* enable alpha */
-		 LCD_OSDC_F0EN,	/* enable Foreground0 */
-		 .osd_ctrl = 0,		/* disable ipu,  */
-		 .rgb_ctrl = 0,
-		 .bgcolor = 0x0, /* set background color Black */
-		 .colorkey0 = 0, /* disable colorkey */
-		 .colorkey1 = 0, /* disable colorkey */
-		 .alpha = 0xA0,	/* alpha value */
-		 .ipu_restart = 0x80001000, /* ipu restart */
-		 .fg_change = FG_CHANGE_ALL, /* change all initially */
-//		 .fg0 = {32, 0, 0, 1024, 768}, /* bpp, x, y, w, h */
-		 .fg0 = {32, 0, 0, 320, 240}, /* bpp, x, y, w, h */
-		 .fg1 = {32, 0, 0, 320, 240}, /* bpp, x, y, w, h */
-		},
 
-#elif defined(CONFIG_JZ4760_LCD_KD101N2)
-	.panel = {
+#elif defined(CONFIG_JZ4760_LCD_RS97_V21)
+    .panel = {
 		.cfg = LCD_CFG_LCDPIN_LCD | LCD_CFG_RECOVER | /* Underrun recover */ 
-		LCD_CFG_NEWDES | /* 8words descriptor */
-		LCD_CFG_MODE_GENERIC_TFT | /* General TFT panel */
-		LCD_CFG_MODE_TFT_18BIT|(0<<9)|	/* output 16bpp */
-		LCD_CFG_PCP |	/* PCLK polarity: the falling edge acts as data strobe*/
-		LCD_CFG_HSP |	/* Hsync polarity: active low */
-		LCD_CFG_VSP,	/* Vsync polarity: leading edge is falling edge */
-		.slcd_cfg = 0,
-		.ctrl = LCD_CTRL_OFUM | LCD_CTRL_BST_16_CTN,	/* 16words burst, enable out FIFO underrun irq */
-		//  width,height,freq,hsync,vsync,elw,blw,efw,bfw         
-		1024, 600, 45, 1, 1, 320, 0, 35, 0,
-	},
-	.osd = {
-		 .osd_cfg = LCD_OSDC_OSDEN | /* Use OSD mode */
-		 LCD_OSDC_ALPHAEN | /* enable alpha */
-		 LCD_OSDC_F0EN,	/* enable Foreground0 */
-		 .osd_ctrl = 0,		/* disable ipu,  */
-		 .rgb_ctrl = 0,
-		 .bgcolor = 0x0, /* set background color Black */
-		 .colorkey0 = 0, /* disable colorkey */
-		 .colorkey1 = 0, /* disable colorkey */
-		 .alpha = 0xA0,	/* alpha value */
-		 .ipu_restart = 0x80001000, /* ipu restart */
-		 .fg_change = FG_CHANGE_ALL, /* change all initially */
-		 .fg0 = {32, 0, 0, 1024, 600}, /* bpp, x, y, w, h */
-		 .fg1 = {32, 0, 0, 1024, 600}, /* bpp, x, y, w, h */
-		},
+			   LCD_CFG_MODE_SERIAL_TFT | /* General TFT panel */
+			   LCD_CFG_MODE_TFT_16BIT |
+			   LCD_CFG_PCP |
+			   LCD_CFG_NEWDES, /* 8words descriptor */
 
-#elif defined(CONFIG_JZ4760_LCD_KD101N4)
-	.panel = {
-		.cfg = LCD_CFG_LCDPIN_LCD | LCD_CFG_RECOVER | /* Underrun recover */ 
-		LCD_CFG_NEWDES | /* 8words descriptor */
-		LCD_CFG_MODE_GENERIC_TFT | /* General TFT panel */
-		LCD_CFG_MODE_TFT_18BIT|(0<<9)|	/* output 16bpp */
-		LCD_CFG_PCP |	/* PCLK polarity: the falling edge acts as data strobe*/
-		LCD_CFG_HSP |	/* Hsync polarity: active low */
-		LCD_CFG_VSP,	/* Vsync polarity: leading edge is falling edge */
 		.slcd_cfg = 0,
-		.ctrl = LCD_CTRL_OFUM | LCD_CTRL_BST_16_CTN,	/* 16words burst, enable out FIFO underrun irq */
-		//  width,height,freq,hsync,vsync,elw,blw,efw,bfw         
-		1280, 800, 27, 1, 1, 168, 32, 16, 0,
+		.ctrl = LCD_CTRL_OFUM | LCD_CTRL_BST_16,	/* 16words burst, enable out FIFO underrun irq */
+		320, 480, 120, 20, 1, 32, 40, 17, 27,	//INNOLUX
 	},
+
 	.osd = {
 		 .osd_cfg = LCD_OSDC_OSDEN | /* Use OSD mode */
-		 LCD_OSDC_ALPHAEN | /* enable alpha */
-		 LCD_OSDC_F0EN,	/* enable Foreground0 */
-		 .osd_ctrl = 0,		/* disable ipu,  */
-		 .rgb_ctrl = 0,
-		 .bgcolor = 0x0, /* set background color Black */
-		 .colorkey0 = 0, /* disable colorkey */
-		 .colorkey1 = 0, /* disable colorkey */
-		 .alpha = 0xA0,	/* alpha value */
+		 //LCD_OSDC_ALPHAEN | /* enable alpha */
+		 //LCD_OSDC_F1EN |	/* enable Foreground0 */
+		 LCD_OSDC_F0EN, /* enable Foreground0 */
+		 .osd_ctrl = 0, 	/* disable ipu,  */
+		 .rgb_ctrl = LCD_RGBC_EVEN_GBR << LCD_RGBC_EVENRGB_BIT,
+		 .bgcolor = 0x000000, /* set background color Black */
+		 .colorkey0 = 0x80000000, /* disable colorkey */
+		 .colorkey1 = 0x80000000, /* disable colorkey */
+		 .alpha = 0xa0, /* alpha value */
 		 .ipu_restart = 0x80001000, /* ipu restart */
 		 .fg_change = FG_CHANGE_ALL, /* change all initially */
-		 .fg0 = {32, 0, 0, 1280, 800}, /* bpp, x, y, w, h */
-		 .fg1 = {32, 0, 0, 1280, 800}, /* bpp, x, y, w, h */
-		},
+		 .fg0 = {16, 0, 0, 320,480}, /* bpp, x, y, w, h */
+		 .fg1 = {16, 0, 0, 320,480}, /* bpp, x, y, w, h */
+	 },
+
+#elif defined(CONFIG_JZ4760_LCD_RS97_V30)
+    .panel = {
+		.cfg = LCD_CFG_LCDPIN_LCD | LCD_CFG_RECOVER | /* Underrun recover */ 
+			   LCD_CFG_MODE_SERIAL_TFT | /* General TFT panel */
+			   LCD_CFG_MODE_TFT_16BIT |
+			   LCD_CFG_PCP |
+			   LCD_CFG_NEWDES, /* 8words descriptor */
+
+		.slcd_cfg = 0,
+		.ctrl = LCD_CTRL_OFUM | LCD_CTRL_BST_16,	/* 16words burst, enable out FIFO underrun irq */
+		320, 480, 120, 20, 1, 48, 40, 10, 42,  //ILI8965
+	},
+
+	.osd = {
+		 .osd_cfg = LCD_OSDC_OSDEN | /* Use OSD mode */
+		 //LCD_OSDC_ALPHAEN | /* enable alpha */
+		 //LCD_OSDC_F1EN |	/* enable Foreground0 */
+		 LCD_OSDC_F0EN, /* enable Foreground0 */
+		 .osd_ctrl = 0, 	/* disable ipu,  */
+		 .rgb_ctrl = LCD_RGBC_ODD_GBR << LCD_RGBC_ODDRGB_BIT,
+		 .bgcolor = 0x000000, /* set background color Black */
+		 .colorkey0 = 0x80000000, /* disable colorkey */
+		 .colorkey1 = 0x80000000, /* disable colorkey */
+		 .alpha = 0xa0, /* alpha value */
+		 .ipu_restart = 0x80001000, /* ipu restart */
+		 .fg_change = FG_CHANGE_ALL, /* change all initially */
+		 .fg0 = {16, 0, 0, 320,480}, /* bpp, x, y, w, h */
+		 .fg1 = {16, 0, 0, 320,480}, /* bpp, x, y, w, h */
+	 },
 
 #else
 #error "Select LCD panel first!!!"
@@ -531,13 +390,10 @@ struct jz4760lcd_info jz4760_lcd_panel = {
 #define   AIC_FR_TFTH_BIT         16
 #define   AIC_FR_RFTH_BIT         24
 
-#define PANEL_MODE_HDMI_480P   	 3
-#define PANEL_MODE_HDMI_576P   	 4
-#define PANEL_MODE_HDMI_720P50 	 5
-#define PANEL_MODE_HDMI_720P60 	 6
-#define PANEL_MODE_HDMI_1080P30  7
-#define PANEL_MODE_HDMI_1080P50  8
-#define PANEL_MODE_HDMI_1080P60  9
+#define PANEL_MODE_HDMI_480P    3
+#define PANEL_MODE_HDMI_576P    4
+#define PANEL_MODE_HDMI_720P50  5
+#define PANEL_MODE_HDMI_720P60  6
 
 struct jz4760lcd_info jz4760_info_hdmi_480p = {                            
         .panel = {                                                     
@@ -553,7 +409,7 @@ struct jz4760lcd_info jz4760_info_hdmi_480p = {
 	},                                      
         .osd = {                                
                 .osd_cfg =  LCD_OSDC_OSDEN      |               // Use OSD mode
-                 //LCD_OSDC_ALPHAEN                       |               // enable alpha
+                 LCD_OSDC_ALPHAEN                       |               // enable alpha
                  LCD_OSDC_F0EN                          ,               // enable Foreground0    
                 // LCD_OSDC_F1EN,                                         // enable Foreground1    
 		
@@ -595,7 +451,7 @@ struct jz4760lcd_info jz4760_info_hdmi_576p = {
                  .alpha = 0xa0,                                         // alpha value
                  .ipu_restart = 0x8000085d,                     // ipu restart
                  .fg_change = FG_CHANGE_ALL,            // change all initially
-		 .fg0 = {32, 0, 0, 720, 576},   // bpp, x, y, w, h
+				 .fg0 = {32, 0, 0, 720, 576},   // bpp, x, y, w, h
                  .fg1 = {32, 0, 0, 720, 576},       // bpp, x, y, w, h
         },
 };
@@ -661,122 +517,39 @@ struct jz4760lcd_info jz4760_info_hdmi_720p60 = {
                  .fg1 = {32, 0, 0, 1280, 720},       // bpp, x, y, w, h
         },
 };
-struct jz4760lcd_info jz4760_info_hdmi_1080p30 = {
-        .panel = {
-                .cfg = LCD_CFG_MODE_GENERIC_TFT | LCD_CFG_MODE_TFT_24BIT |
-                       LCD_CFG_NEWDES | LCD_CFG_RECOVER |
-                       LCD_CFG_PCP | LCD_CFG_HSP | LCD_CFG_VSP,
-                .slcd_cfg = 0,
-                .ctrl = LCD_CTRL_BST_32,
-                //  width,height,freq,hsync,vsync,elw,blw,efw,bfw
-                1920,1080,30,44,5,148,88,36,4
-                //800,600,58,128,4,88,40,23,1,i
-                //1024,768,60,136,6,160,24,29,3,
-        },
-        .osd = {
-                .osd_cfg =  LCD_OSDC_OSDEN      |               // Use OSD mode
-                 LCD_OSDC_ALPHAEN                       |               // enable alpha
-                 LCD_OSDC_F0EN                          ,               // enable Foreground0
-                // LCD_OSDC_F1EN,                                         // enable Foreground1
 
-                 .osd_ctrl = 0,                                         // disable ipu,
-                 .rgb_ctrl = 0,
-                 .bgcolor = 0x000000,                           // set background color Black
-                 .colorkey0 = 0,                                        // disable colorkey
-                 .colorkey1 = 0,                                        // disable colorkey
-                 .alpha = 0xa0,                                         // alpha value
-                 .ipu_restart = 0x8000085d,                     // ipu restart
-                 .fg_change = FG_CHANGE_ALL,            // change all initially
-                 .fg0 = {32, 0, 0, 1920, 1080},   // bpp, x, y, w, h
-                 .fg1 = {32, 0, 0, 1920, 1080},       // bpp, x, y, w, h
-        },
-};
-
-
-
-
-struct jz4760lcd_info jz4760_info_hdmi_1080p50 = {
-        .panel = {
-                .cfg = LCD_CFG_MODE_GENERIC_TFT | LCD_CFG_MODE_TFT_24BIT |
-                       LCD_CFG_NEWDES | LCD_CFG_RECOVER |
-                       LCD_CFG_PCP | LCD_CFG_HSP | LCD_CFG_VSP,
-                .slcd_cfg = 0,
-                .ctrl = LCD_CTRL_BST_32|LCD_CTRL_OFUM,
-                //  width,height,freq,hsync,vsync,elw,blw,efw,bfw
-                1920,1080,50,44,5,148,528,36,4
-                //800,600,58,128,4,88,40,23,1,i
-                //1024,768,60,136,6,160,24,29,3,
-        },
-        .osd = {
-                .osd_cfg =  LCD_OSDC_OSDEN      |               // Use OSD mode
-                 LCD_OSDC_ALPHAEN                       |               // enable alpha
-                 LCD_OSDC_F0EN                          ,               // enable Foreground0
-                // LCD_OSDC_F1EN,                                         // enable Foreground1
-
-                 .osd_ctrl = 0,                                         // disable ipu,
-                 .rgb_ctrl = 0,
-                 .bgcolor = 0x000000,                           // set background color Black
-                 .colorkey0 = 0,                                        // disable colorkey
-                 .colorkey1 = 0,                                        // disable colorkey
-                 .alpha = 0xa0,                                         // alpha value
-                 .ipu_restart = 0x8000085d,                     // ipu restart
-                 .fg_change = FG_CHANGE_ALL,            // change all initially
-                 .fg0 = {32, 0, 0, 1920, 1080},   // bpp, x, y, w, h
-                 .fg1 = {32, 0, 0, 1920, 1080},       // bpp, x, y, w, h
-        },
-};
-
-
-
-struct jz4760lcd_info jz4760_info_hdmi_1080p60 = {                            
-        .panel = {                                                     
-                .cfg = LCD_CFG_MODE_GENERIC_TFT | LCD_CFG_MODE_TFT_24BIT |
-                       LCD_CFG_NEWDES | LCD_CFG_RECOVER |                 
-                       LCD_CFG_PCP | LCD_CFG_HSP | LCD_CFG_VSP,           
-                .slcd_cfg = 0,                                            
-		.ctrl = LCD_CTRL_BST_64|LCD_CTRL_OFUM,                                  //  width,height,freq,hsync,vsync,elw,blw,efw,bfw         
-		1920,1080,60,44,5,148,88,37,4	                 
-		//800,600,58,128,4,88,40,23,1,i
-		//1024,768,60,136,6,160,24,29,3,
-	},            
-        .osd = {                                
-                .osd_cfg =  LCD_OSDC_OSDEN      |               // Use OSD mode
-                 LCD_OSDC_ALPHAEN                       |               // enable alpha
-                 LCD_OSDC_F0EN                          ,               // enable Foreground0    
-                // LCD_OSDC_F1EN,                                         // enable Foreground1    
-		
-                 .osd_ctrl = 0,                                         // disable ipu,          
-                 .rgb_ctrl = 0,                                                                  
-                 .bgcolor = 0x000000,                           // set background color Black    
-                 .colorkey0 = 0,                                        // disable colorkey
-                 .colorkey1 = 0,                                        // disable colorkey
-                 .alpha = 0xa0,                                         // alpha value
-                 .ipu_restart = 0x8000085d,                     // ipu restart
-                 .fg_change = FG_CHANGE_ALL,            // change all initially
-		 .fg0 = {32, 0, 0, 1920, 1080},   // bpp, x, y, w, h
-                 .fg1 = {32, 0, 0, 1920, 1080},       // bpp, x, y, w, h
-        },
-};
-
-extern void jz4760b_i2s_set_external_codec(void);
-extern void jz4760b_i2s_set_internal_codec(void);
-static int i2s_external_flag = 0;
 static void set_i2s_external_codec(void)
 {
-	i2s_external_flag = 1;
-	__gpio_as_func1(3*32 + 12); //blck
-	__gpio_as_func0(3*32 + 13); //sync
-	__gpio_as_func0(4*32 + 7);  //sd0
-	jz4760b_i2s_set_external_codec();
+#if	defined(CONFIG_JZ4760_CYGNUS) || defined(CONFIG_JZ4760B_CYGNUS)
+	/* gpio defined based on CYGNUS board */
+        __gpio_as_func1(3*32 + 12); //blck
+        __gpio_as_func0(3*32 + 13); //sync
+        __gpio_as_func0(4*32 + 7);  //sd0
+        __gpio_as_func0(4*32 + 11); //sd1
+        __gpio_as_func0(4*32 + 12); //sd2
+        __gpio_as_func0(4*32 + 13); //sd3
+#endif
 
-}
 
-static void set_i2s_internal_codec(void)
-{
-	if (i2s_external_flag == 1){
-		jz4760b_i2s_set_internal_codec();
-		i2s_external_flag = 0;
-	}
+        __i2s_external_codec();
+
+        __aic_select_i2s();
+        __i2s_select_i2s();
+        __i2s_as_master();
+
+        REG_AIC_I2SCR |= AIC_I2SCR_ESCLK;
+
+        __i2s_disable_record();
+        __i2s_disable_replay();
+        __i2s_disable_loopback();
+
+        REG_AIC_FR &= ~AIC_FR_TFTH_MASK;
+        REG_AIC_FR |= ((8) << AIC_FR_TFTH_BIT);
+        REG_AIC_FR &= ~AIC_FR_RFTH_MASK;
+        REG_AIC_FR |= ((8) << AIC_FR_RFTH_BIT);
+
+        __i2s_enable();
+
 }
 #endif
 
@@ -792,28 +565,25 @@ struct jz4760lcd_info jz4760_info_tve = {
 	},
 	.osd = {
 		 .osd_cfg = LCD_OSDC_OSDEN | /* Use OSD mode */
-		// LCD_OSDC_ALPHAEN | /* enable alpha */
-		// LCD_OSDC_F1EN|	/* enable Foreground0 */
+//		 LCD_OSDC_ALPHAEN | /* enable alpha */
 		 LCD_OSDC_F0EN,	/* enable Foreground0 */
 		 .osd_ctrl = 0,		/* disable ipu,  */
 		 .rgb_ctrl = LCD_RGBC_YCC, /* enable RGB => YUV */
 		 .bgcolor = 0x00000000, /* set background color Black */
-		 .colorkey0 = 0x80000000, /* disable colorkey */
+		 .colorkey0 = 0, /* disable colorkey */
 		 .colorkey1 = 0, /* disable colorkey */
 		 .alpha = 0xA0,	/* alpha value */
 		 .ipu_restart = 0x80000100, /* ipu restart */
 		 .fg_change = FG_CHANGE_ALL, /* change all initially */
-		 .fg0 = {16,},	/*  */
-		 .fg1 = {16,},
+		 .fg0 = {32,},	/*  */
+		 .fg0 = {32,},
 	},
 };
 
 struct jz4760lcd_info *jz4760_lcd_info = &jz4760_lcd_panel; /* default output to lcd panel */
-int LCD_SCREEN_W;
-int LCD_SCREEN_H;
 
-#if JZ_FB_DEBUG
-void print_lcdc_registers(void)	/* debug */
+#if 0//JZ_FB_DEBUG
+static void print_lcdc_registers(void)	/* debug */
 {
 	/* LCD Controller Resgisters */
 	printk("REG_LCD_CFG:\t0x%08x\n", REG_LCD_CFG);
@@ -903,9 +673,7 @@ void print_lcdc_registers(void)	/* debug */
 #endif
 }
 #else
-void print_lcdc_registers(void)	/* debug */
-{
-}
+#define print_lcdc_registers()
 #endif
 
 struct lcd_cfb_info {
@@ -926,7 +694,8 @@ static struct jz4760_lcd_dma_desc *dma0_desc_palette, *dma0_desc0, *dma0_desc1, 
 #define DMA_DESC_NUM 		6
 
 static unsigned char *lcd_palette;
-unsigned char *lcd_frame1;
+static unsigned char *lcd_frame0;
+static unsigned char *lcd_frame1;
 
 static struct jz4760_lcd_dma_desc *dma0_desc_cmd0, *dma0_desc_cmd;
 static unsigned char *lcd_cmdbuf;
@@ -938,19 +707,6 @@ static int jz4760fb_set_backlight_level(int n);
 
 static int screen_on(void);
 static int screen_off(void);
-
-int get_lcd_width(void)
-{
-	return LCD_SCREEN_W;
-}
-int get_lcd_hight(void)
-{
-	return LCD_SCREEN_H;
-}
-EXPORT_SYMBOL(get_lcd_width);
-EXPORT_SYMBOL(get_lcd_hight);
-
-
 
 static void ctrl_enable(void)
 {
@@ -970,13 +726,12 @@ static void ctrl_disable(void)
 	else {
 		int cnt;
 		/* when CPU main freq is 336MHz,wait for 30ms */
-		cnt = 528000 * 3;
+		cnt = 528000 * 30;
 		__lcd_set_dis(); /* regular disable */
 		//__lcd_clr_ena();
 		while(!__lcd_disable_done() && cnt) {
 			cnt--;
 		}
-
 		if (cnt == 0)
 			printk("LCD disable timeout! REG_LCD_STATE=0x%08xx\n",REG_LCD_STATE);
 		REG_LCD_STATE &= ~LCD_STATE_LDD;
@@ -1076,133 +831,6 @@ static int jz4760fb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
 	return 0;
 }
 
-static struct task_struct * resize_task;
-static struct task_struct * resize_a320_original_task = NULL;
-static struct task_struct * resize_a320_full_screen_task = NULL;
-unsigned int resize_a320_go_out = 0;
-unsigned short *frame_dst;
-unsigned short *frame_src;
-//unsigned short frame_temp[640*480];
-
-#define SCALE_WIDTH  160 //x_src = (x_dest * SCALE_WIDTH) >> 8
-#define SCALE_HEIGHT  128 //y_src = (y_dest * SCALE_HEIGHT) >> 8
-#define GET_R(temp) temp>>11
-#define GET_G(temp) (temp&0x7e0)>>5
-#define GET_B(temp) (temp&0x1f)
-#define CREATE_RGB(r,g,b) (r << 11) | (g << 5) | b
-//char r_pix[640*480];
-//char g_pix[640*480];
-//char b_pix[640*480];
-
-static void fb_a320_thread(unsigned int src_weight, unsigned int src_height, unsigned int dst_weight, unsigned int dst_height,int mode)
-{
-	if (tvout_flag == 1)
-		return;
-  frame_dst = (unsigned short *)lcd_frame01;
-  frame_src = (unsigned short *)lcd_frame0;
-  unsigned short *lcd_frame_temp;
-#define FRACTION_STEP 0x10000
-  const unsigned int  x_fraction=src_weight*FRACTION_STEP/dst_weight;
-  const unsigned int  y_fraction=src_height*FRACTION_STEP/dst_height;
-  unsigned int x_temp = 0;
-  unsigned int y_temp = 0;
-  y_temp = y_fraction;
-  unsigned int original_size_offset = ((dst_height - src_height) >> 1)*dst_weight;
-
-  int i,j;
-#define A320_FULLSCREEN 1
-#define A320_ORIGINAL   2
-  switch (mode)
-  {
-    case A320_FULLSCREEN:
-      for(j = 0; j < dst_height; j++)
-      {
-        y_temp += y_fraction;
-        if(y_temp >= FRACTION_STEP)
-        {
-          y_temp -= FRACTION_STEP;
-          //scale horiontal
-          x_temp = x_fraction;
-          for(i = 0; i < dst_weight; i++)
-          {
-            x_temp += x_fraction;
-            *frame_dst = *frame_src;
-            if(x_temp >= FRACTION_STEP)
-            {
-              frame_src++;
-              x_temp -= FRACTION_STEP;
-            }
-            frame_dst++;
-          }
-          frame_src += dst_weight-320;
-        }
-        else
-        {
-          lcd_frame_temp = frame_dst - dst_weight;
-          for(i = 0; i < dst_weight; i++)
-          {
-            *frame_dst++ = *lcd_frame_temp++;
-          }
-        }
-      }
-      break;
-    case A320_ORIGINAL:
-      frame_dst += original_size_offset;
-      for(j = 0; j < src_height; j++)
-      {
-        frame_dst +=(dst_weight - src_weight)/2;
-        for(i = 0; i < src_weight; i++)
-        {
-          *frame_dst = *frame_src;
-          frame_dst++;
-          frame_src++;
-        }
-        frame_src += dst_weight-320;
-        frame_dst +=(dst_weight - src_weight)/2;
-      }
-      break;
-  }
-}
-
-static int fb_resize_thread(void *unused)
-{
-	printk("kernel frame buffer resize thread start!\n");
-	while(1)
-	{
-		//printk("zzzz\n");
-		set_current_state(TASK_INTERRUPTIBLE);
-		schedule_timeout(HZ/20);
-
-		ipu_driver_flush_tv();
-
-		if(resize_go_out)
-			break;
-	}
-	thread_init_end = 0;
-
-	return 0;
-}
-
-void fb_resize_start(void)
-{
-	if (tvout_flag != 1 || thread_init_end)
-		return;
-//	printk("..............zz.........%s \n", __func__);
-
-#ifdef TVOUT_2x
-	resize_go_out = 0;
-	thread_init_end = 0;
-	resize_task = kthread_run(fb_resize_thread, NULL, "fb_resize");
-	if(IS_ERR(resize_task))
-	{
-		printk("Kernel fb resize thread start error!\n");
-		return;
-	}
-	thread_init_end = 1;
-#endif
-}
-
-EXPORT_SYMBOL(fb_resize_start);
 
 /*
  * switch to tve mode from lcd mode
@@ -1225,20 +853,26 @@ static void jz4760lcd_info_switch_to_TVE(int mode)
 		info->panel.w = TVE_WIDTH_PAL;
 		info->panel.h = TVE_HEIGHT_PAL;
 		info->panel.fclk = TVE_FREQ_PAL;
-
-		w = 640;
-		h = 480;
-		x = (TVE_WIDTH_PAL - 640)/2;
-		y = (TVE_HEIGHT_PAL - 480)/2;
+		w = ( osd_lcd->fg0.w < TVE_WIDTH_PAL )? osd_lcd->fg0.w:TVE_WIDTH_PAL;
+		h = ( osd_lcd->fg0.h < TVE_HEIGHT_PAL )?osd_lcd->fg0.h:TVE_HEIGHT_PAL;
+		x = ((TVE_WIDTH_PAL - w) >> 2) << 1;
+		y = ((TVE_HEIGHT_PAL - h) >> 2) << 1;
+//		x = 0;
+//		y = 0;
 
 		info->osd.fg0.bpp = osd_lcd->fg0.bpp;
 		info->osd.fg0.x = x;
 		info->osd.fg0.y = y;
 		info->osd.fg0.w = w;
 		info->osd.fg0.h = h;
+		w = ( osd_lcd->fg1.w < TVE_WIDTH_PAL )? osd_lcd->fg1.w:TVE_WIDTH_PAL;
+		h = ( osd_lcd->fg1.h < TVE_HEIGHT_PAL )?osd_lcd->fg1.h:TVE_HEIGHT_PAL;
+		x = ((TVE_WIDTH_PAL-w) >> 2) << 1;
+		y = ((TVE_HEIGHT_PAL-h) >> 2) << 1;
+//		x = 0;
+//		y = 0;
 
-
-		info->osd.fg1.bpp = 16;	/* use RGB888 in TVE mode*/
+		info->osd.fg1.bpp = 32;	/* use RGB888 in TVE mode*/
 		info->osd.fg1.x = x;
 		info->osd.fg1.y = y;
 		info->osd.fg1.w = w;
@@ -1249,30 +883,22 @@ static void jz4760lcd_info_switch_to_TVE(int mode)
 		info->panel.w = TVE_WIDTH_NTSC;
 		info->panel.h = TVE_HEIGHT_NTSC;
 		info->panel.fclk = TVE_FREQ_NTSC;
-
-#ifdef TVOUT_2x
-		w = 640;
-		h = 480;
-#else
-		w = tvout_display_w;
-		h = tvout_display_h;
-#endif
-	
-#ifdef TVOUT_2x
-		x = (TVE_WIDTH_NTSC - 640)/2;
-		//y = (TVE_HEIGHT_NTSC- 480)/2;
-        y = 2;//y must be even
-#else
-		x = (TVE_WIDTH_PAL - w)/2;
-		y = (TVE_HEIGHT_PAL - h)/2;
-#endif
-
+		w = ( osd_lcd->fg0.w < TVE_WIDTH_NTSC )? osd_lcd->fg0.w:TVE_WIDTH_NTSC;
+		h = ( osd_lcd->fg0.h < TVE_HEIGHT_NTSC)?osd_lcd->fg0.h:TVE_HEIGHT_NTSC;
+		x = ((TVE_WIDTH_NTSC - w) >> 2) << 1;
+		y = ((TVE_HEIGHT_NTSC - h) >> 2) << 1;
+//		x = 0;
+//		y = 0;
 		info->osd.fg0.bpp = osd_lcd->fg0.bpp;
 		info->osd.fg0.x = x;
 		info->osd.fg0.y = y;
 		info->osd.fg0.w = w;
 		info->osd.fg0.h = h;
-		info->osd.fg1.bpp = 16;	/* use RGB888 int TVE mode */
+		w = ( osd_lcd->fg1.w < TVE_WIDTH_NTSC )? osd_lcd->fg1.w:TVE_WIDTH_NTSC;
+		h = ( osd_lcd->fg1.h < TVE_HEIGHT_NTSC)?osd_lcd->fg1.h:TVE_HEIGHT_NTSC;
+		x = ((TVE_WIDTH_NTSC - w) >> 2) << 1;
+		y = ((TVE_HEIGHT_NTSC - h) >> 2) << 1;
+		info->osd.fg1.bpp = 32;	/* use RGB888 int TVE mode */
 		info->osd.fg1.x = x;
 		info->osd.fg1.y = y;
 		info->osd.fg1.w = w;
@@ -1283,54 +909,6 @@ static void jz4760lcd_info_switch_to_TVE(int mode)
 	}
 }
 
-
-static int get_ipu_restart_trigger(void)//from lihuawu
-{
-	int frond_porch;
-	int third_of_vblank;
-	int trigger_value;
-	int ht, vt, vds, vde, hde;
-	/* LCDC spec: ipu_restart_trigger = frond_porch + ((HT-0)x(VPE-VPS))/3 */
-
-	vt = (REG_LCD_VAT&LCD_VAT_VT_MASK)>>LCD_VAT_VT_BIT;
-	ht = (REG_LCD_VAT&LCD_VAT_HT_MASK)>>LCD_VAT_HT_BIT;
-	vds = (REG_LCD_DAV&LCD_DAV_VDS_MASK)>>LCD_DAV_VDS_BIT; /* Vsync start at 0. */
-	vde = (REG_LCD_DAV&LCD_DAV_VDE_MASK)>>LCD_DAV_VDE_BIT;
-	hde = (REG_LCD_DAH&LCD_DAH_HDE_MASK)>>LCD_DAV_VDE_BIT;
-
-	if (hde>ht) {
-		printk("LCDC config error hde>ht\n");
-		hde = ht;
-	}
-	if (vde>vt) {
-		printk("LCDC config error vde>vt\n");
-		vde = vt;
-	}
-
-	third_of_vblank = (ht*vds)/3;
-	frond_porch = (ht-hde) + (vt-vde)*ht;
-	trigger_value = (frond_porch + third_of_vblank);
-#if JZ_FB_DEBUG
-	printk("\n");
-	printk("\n REG_LCD_VAT=0x%08X", REG_LCD_VAT);
-	printk("\n REG_LCD_DAV=0x%08X", REG_LCD_DAV);
-	printk("\n REG_LCD_DAH=0x%08X", REG_LCD_DAH);
-	printk("\n");
-	printk("\t ht = %d", ht);
-	printk("\t vt = %d", vt);
-	printk("\t vds = %d",vds );
-	printk("\t vde = %d", vde);
-	printk("\t hde = %d", hde);
-	printk("\n third_of_vblank = %d", third_of_vblank);
-	printk("\n frond_porch = %d", frond_porch);
-	printk("\n trigger_value = %d", trigger_value);
-	printk("\n");
-
-#endif
-
-	return trigger_value;
-}
-
 static int jz4760fb_ioctl(struct fb_info *info, unsigned int cmd, unsigned long arg)
 {
 	int ret = 0;
@@ -1338,26 +916,26 @@ static int jz4760fb_ioctl(struct fb_info *info, unsigned int cmd, unsigned long 
         void __user *argp = (void __user *)arg;
 
 	switch (cmd) {
-	case FBIO_WAITFORVSYNC:
-		printk("FBIO_WAITFORVSYNC");
+	case FBIOSETBACKLIGHT:
+		jz4760fb_set_backlight_level(arg);
+
 		break;
-    case FBIOENBALECRTL:
-        ctrl_enable();
-        break;
 
 	case FBIODISPON:
 		ctrl_enable();
-        screen_on();
-        break;
+		screen_on();
+
+		break;
 
 	case FBIODISPOFF:
 		screen_off();
 		ctrl_disable();
-		memset(lcd_frame1,0,640*480*2);
+
 		break;
 
 	case FBIOPRINT_REG:
 		print_lcdc_registers();
+
 		break;
 
 	case FBIO_GET_MODE:
@@ -1376,6 +954,7 @@ static int jz4760fb_ioctl(struct fb_info *info, unsigned int cmd, unsigned long 
 
 		/* set mode */
 		jz4760fb_set_mode(jz4760_lcd_info);
+
 		break;
 
 	case FBIO_DEEP_SET_MODE:
@@ -1387,18 +966,9 @@ static int jz4760fb_ioctl(struct fb_info *info, unsigned int cmd, unsigned long 
 		jz4760fb_deep_set_mode(jz4760_lcd_info);
 
 		break;
-    case FBIO_GET_IPU_RESTART_VALUE:
-		if((panel_mode == PANEL_MODE_TVE_PAL) || (last_panel_mode == PANEL_MODE_TVE_NTSC))//tvout
-		    return 0x4000;
-		else//lcd and hdmi
-		    return get_ipu_restart_trigger();
-
-		return 0;
-		break;
 
 	case FBIO_MODE_SWITCH:
-        D("FBIO_MODE_SWITCH");
-        panel_mode = arg;
+		D("FBIO_MODE_SWITCH");
 		switch (arg) {
 #ifdef CONFIG_FB_JZ4760_TVE
 			case PANEL_MODE_TVE_PAL: 	/* switch to TVE_PAL mode */
@@ -1412,9 +982,9 @@ static int jz4760fb_ioctl(struct fb_info *info, unsigned int cmd, unsigned long 
 				screen_off();
 				break;
 #endif
-#if defined(CONFIG_JZ4760_HDMI_DISPLAY)
+#if defined(CONFIG_JZ4760_HDMI_DISPLAY)  
  			case PANEL_MODE_HDMI_480P:
-                set_i2s_external_codec();
+   				set_i2s_external_codec();
 				/* turn off TVE, turn off DACn... */
 				//jz4760tve_disable_tve();
 				jz4760_lcd_info =&jz4760_info_hdmi_480p ;
@@ -1461,35 +1031,6 @@ static int jz4760fb_ioctl(struct fb_info *info, unsigned int cmd, unsigned long 
 				/* turn on lcd backlight */
 				screen_off();
 				break;
-			case PANEL_MODE_HDMI_1080P30:
-                                REG_LCD_PCFG = 0xc4010000;
-                                set_i2s_external_codec();
-                                /* turn off TVE, turn off DACn... */
-                                //jz4760tve_disable_tve();
-                                jz4760_lcd_info =&jz4760_info_hdmi_1080p30;
-                                /* turn on lcd backlight */
-                                screen_off();
-                                break;
-
-                        case PANEL_MODE_HDMI_1080P50:
-                                REG_LCD_PCFG = 0xc4010000;
-                                set_i2s_external_codec();
-                                /* turn off TVE, turn off DACn... */
-                                //jz4760tve_disable_tve();
-                                jz4760_lcd_info =&jz4760_info_hdmi_1080p50;
-                                /* turn on lcd backlight */
-                                screen_off();
-                                break;
-
-			case PANEL_MODE_HDMI_1080P60:
-                                REG_LCD_PCFG = 0xc4010000;
-   				set_i2s_external_codec();
-				/* turn off TVE, turn off DACn... */
-				//jz4760tve_disable_tve();
-				jz4760_lcd_info =&jz4760_info_hdmi_1080p60;
-				/* turn on lcd backlight */
-				screen_off();
-				break;
 #endif	//CONFIG_JZ4760_HDMI_DISPLAY
 			case PANEL_MODE_LCD_PANEL: 	/* switch to LCD mode */
 			default :
@@ -1498,18 +1039,11 @@ static int jz4760fb_ioctl(struct fb_info *info, unsigned int cmd, unsigned long 
 				jz4760tve_disable_tve();
 				cpm_stop_clock(CGM_TVE);
 #endif
-				//medive change for hdmi
-#if defined(CONFIG_JZ4760_HDMI_DISPLAY)
-				if (panle_mode != 2)
-					set_i2s_internal_codec();
-#endif
-
 				jz4760_lcd_info = &jz4760_lcd_panel;
 				/* turn on lcd backlight */
-				//screen_on();   //medive
+				screen_on();
 				break;
 		}
-
 		jz4760fb_deep_set_mode(jz4760_lcd_info);
 		break;
 
@@ -1577,7 +1111,7 @@ static int jz4760fb_mmap(struct fb_info *info, struct vm_area_struct *vma)
  * DO NOT MODIFY PAR */
 static int jz4760fb_check_var(struct fb_var_screeninfo *var, struct fb_info *info)
 {
-	//printk("jz4760fb_check_var, not implement\n");
+	printk("jz4760fb_check_var, not implement\n");
 	return 0;
 }
 
@@ -1587,12 +1121,7 @@ static int jz4760fb_check_var(struct fb_var_screeninfo *var, struct fb_info *inf
  */
 static int jz4760fb_set_par(struct fb_info *info)
 {
-	struct myfb_par *par = info->par;
-	printk("YRES_VIRTUAL = %d, YRES = %d\n",info->var.yres_virtual,info->var.yres);
-	if (info->var.yres_virtual != info->var.yres)
-		printk("Required double buffer\n");
-
-	// printk("jz4760fb_set_par, not implemented\n");
+	printk("jz4760fb_set_par, not implemented\n");
 	return 0;
 }
 
@@ -1636,15 +1165,28 @@ static int jz4760fb_blank(int blank_mode, struct fb_info *info)
 static int jz4760fb_pan_display(struct fb_var_screeninfo *var, struct fb_info *info)
 {
 	struct lcd_cfb_info *cfb = (struct lcd_cfb_info *)info;
+	int dy;
 
 	if (!var || !cfb) {
 		return -EINVAL;
 	}
 
-	dma0_desc0->databuf = (unsigned int)virt_to_phys((void *)lcd_frame0 + 
-	((var->xoffset * info->var.bits_per_pixel) / 8) +
-	(var->yoffset * cfb->fb.fix.line_length));
-	dma_cache_wback((unsigned int)(dma0_desc0), sizeof(struct jz4760_lcd_dma_desc));
+	if (var->xoffset - cfb->fb.var.xoffset) {
+		/* No support for X panning for now! */
+		return -EINVAL;
+	}
+
+	dy = var->yoffset;
+	D("var.yoffset: %d", dy);
+	if (dy) {
+		dma0_desc0->databuf = (unsigned int)virt_to_phys((void *)lcd_frame0 + (cfb->fb.fix.line_length * dy));
+		dma_cache_wback((unsigned int)(dma0_desc0), sizeof(struct jz4760_lcd_dma_desc));
+
+	}
+	else {
+		dma0_desc0->databuf = (unsigned int)virt_to_phys((void *)lcd_frame0);
+		dma_cache_wback((unsigned int)(dma0_desc0), sizeof(struct jz4760_lcd_dma_desc));
+	}
 
 	return 0;
 }
@@ -1674,21 +1216,6 @@ static int jz4760fb_set_var(struct fb_var_screeninfo *var, int con,
 
 	var->height	            = lcd_info->osd.fg0.h;	/* tve mode */
 	var->width	            = lcd_info->osd.fg0.w;
-	//printk("fg0.h %d,fg0.w %d fg1.h %d fg1.w %d\n",var->height,var->width,lcd_info->osd.fg1.h,lcd_info->osd.fg1.w);
-
-
-	if (tvout_640_480 == 0)
-	{
-		var->height 		= LCD_SCREEN_H;
-		var->width			= LCD_SCREEN_W;
-		//printk("ccc....var->height %d,var->width %d \n",var->height,var->width);
-	}
-	else if (tvout_640_480 == 1)
-	{
-		var->height = 480;
-		var->width = 640;
-	}
-
 	var->bits_per_pixel	    = lcd_info->osd.fg0.bpp;
 
 	var->vmode                  = FB_VMODE_NONINTERLACED;
@@ -1841,7 +1368,7 @@ static int jz4760fb_set_var(struct fb_var_screeninfo *var, int con,
 	 * defaults used to create new consoles.
 	 */
 	fb_set_cmap(&cfb->fb.cmap, &cfb->fb);
-	
+
 	return 0;
 }
 
@@ -1903,21 +1430,12 @@ static struct lcd_cfb_info * jz4760fb_alloc_fb_info(void)
 static int bpp_to_data_bpp(int bpp)
 {
 	switch (bpp) {
-		case 1:
-		case 2:
-		case 4:
-		case 8:
-		case 16:
 		case 32:
+		case 16:
 			break;
 
 		case 15:
 			bpp = 16;
-			break;
-
-		case 18:
-		case 24:
-			bpp = 32;
 			break;
 
 		default:
@@ -1945,7 +1463,6 @@ static int jz4760fb_map_smem(struct lcd_cfb_info *cfb)
 #else
 	w = ( jz4760_lcd_info->osd.fg0.w > TVE_WIDTH_PAL )?jz4760_lcd_info->osd.fg0.w:TVE_WIDTH_PAL;
 	h = ( jz4760_lcd_info->osd.fg0.h > TVE_HEIGHT_PAL )?jz4760_lcd_info->osd.fg0.h:TVE_HEIGHT_PAL;
-        printk("%s %d %d \n",__func__,w,h);
 #endif
 	needroom1 = needroom = ((w * bpp + 7) >> 3) * h * 3;
 
@@ -1960,29 +1477,20 @@ static int jz4760fb_map_smem(struct lcd_cfb_info *cfb)
 #else
 	w = ( jz4760_lcd_info->osd.fg1.w > TVE_WIDTH_PAL )?jz4760_lcd_info->osd.fg1.w:TVE_WIDTH_PAL;
 	h = ( jz4760_lcd_info->osd.fg1.h > TVE_HEIGHT_PAL )?jz4760_lcd_info->osd.fg1.h:TVE_HEIGHT_PAL;
-
 #endif
-        printk("%s %d %d \n",__func__,w,h);
 	needroom += ((w * bpp + 7) >> 3) * h * 3;
 #endif // two layer
 
 	for (page_shift = 0; page_shift < 13; page_shift++)
 		if ((PAGE_SIZE << page_shift) >= needroom)
 			break;
-	printk("page count is %d\n",page_shift);
 #if defined(CONFIG_JZ4760_HDMI_DISPLAY)
 	page_shift = 11;
 #endif
-	lcd_palette = (unsigned char *)__get_free_pages(GFP_KERNEL | GFP_DMA, 0);
-	lcd_frame0 = (unsigned char *)__get_free_pages(GFP_KERNEL | GFP_DMA, page_shift);
-    lcd_frame01 = (unsigned char *)__get_free_pages(GFP_KERNEL | GFP_DMA, page_shift);
+	lcd_palette = (unsigned char *)__get_free_pages(GFP_KERNEL, 0);
+	lcd_frame0 = (unsigned char *)__get_free_pages(GFP_KERNEL, page_shift);
 
-	//maddrone add for mplayer trans fb
-	vmfbmem_addr = lcd_frame01;
-	memset(vmfbmem_addr,0xff,LCD_SCREEN_W*LCD_SCREEN_H*2);
-    phy_vmfbmem_addr = virt_to_phys((void *)vmfbmem_addr);
-
-	if ((!lcd_palette) || (!lcd_frame0)|| (!lcd_frame01))
+	if ((!lcd_palette) || (!lcd_frame0))
 		return -ENOMEM;
 	memset((void *)lcd_palette, 0, PAGE_SIZE);
 	memset((void *)lcd_frame0, 0, PAGE_SIZE << page_shift);
@@ -2017,11 +1525,6 @@ static int jz4760fb_map_smem(struct lcd_cfb_info *cfb)
 	for (page = (unsigned long)lcd_frame0;
 	     page < PAGE_ALIGN((unsigned long)lcd_frame0 + (PAGE_SIZE<<page_shift));
 	     page += PAGE_SIZE) {
-		SetPageReserved(virt_to_page((void*)page));
-	}
-        for (page = (unsigned long)lcd_frame01;
-            page < PAGE_ALIGN((unsigned long)lcd_frame01 + (PAGE_SIZE<<page_shift));
-            page += PAGE_SIZE) {
 		SetPageReserved(virt_to_page((void*)page));
 	}
 
@@ -2103,7 +1606,6 @@ static void jz4760fb_unmap_smem(struct lcd_cfb_info *cfb)
 static void jz4760fb_descriptor_init( struct jz4760lcd_info * lcd_info )
 {
 	unsigned int pal_size;
-	unsigned int frame_size0;
 
 	switch ( lcd_info->osd.fg0.bpp ) {
 	case 1:
@@ -2198,48 +1700,8 @@ static void jz4760fb_descriptor_init( struct jz4760lcd_info * lcd_info )
 #endif
 	}
 
-	//maddrone change here
-	if(lcd_info->panel.cfg & LCD_CFG_TVEN)
-	{
-#ifdef TVOUT_2x
-                printk("tvout_640_480 is %d\n",tvout_640_480);
-		if(tvout_640_480)
-		dma0_desc0->databuf = virt_to_phys((void *)lcd_frame0);
-		else
-		dma0_desc0->databuf = virt_to_phys((void *)lcd_frame01);
-		
-		dma0_desc0->frame_id = (unsigned int)0x0000da00; /* DMA0'0 */
-		
-		frame_size0 = (640 * 480 * 16) >> 3;
-		frame_size0 /= 4;
-		dma0_desc0->cmd = frame_size0;
-		dma0_desc0->desc_size = (480 << 16) | 640;
-		dma0_desc0->offsize = 0;
-		dma0_desc0->cmd_num = 0;
-#else
-		dma0_desc0->databuf = virt_to_phys((void *)lcd_frame0);
-		dma0_desc0->frame_id = (unsigned int)0x0000da00; /* DMA0'0 */
-	
-		frame_size0 = (tvout_display_w * tvout_display_h * 16) >> 3;
-		frame_size0 /= 4;
-		dma0_desc0->cmd = frame_size0;
-		dma0_desc0->desc_size = (tvout_display_h << 16) | tvout_display_w;
-		dma0_desc0->offsize = 0;
-		dma0_desc0->cmd_num = 0;
-#endif
-	}
-	else
-	{
-		dma0_desc0->databuf = virt_to_phys((void *)lcd_frame0);
-		dma0_desc0->frame_id = (unsigned int)0x0000da00; /* DMA0'0 */
-	
-		frame_size0 = (LCD_SCREEN_W * LCD_SCREEN_H * 16) >> 3;
-		frame_size0 /= 4;
-		dma0_desc0->cmd = frame_size0;
-		dma0_desc0->desc_size = (LCD_SCREEN_H << 16) | LCD_SCREEN_W;
-		dma0_desc0->offsize = 0;
-		dma0_desc0->cmd_num = 0;
-	}
+	dma0_desc0->databuf = virt_to_phys((void *)lcd_frame0);
+	dma0_desc0->frame_id = (unsigned int)0x0000da00; /* DMA0'0 */
 
 	/* DMA0 Descriptor1 */
 	if ( lcd_info->panel.cfg & LCD_CFG_TVEN ) { /* TVE mode */
@@ -2284,6 +1746,87 @@ static void jz4760fb_descriptor_init( struct jz4760lcd_info * lcd_info )
 	REG_LCD_DA1 = virt_to_phys(dma1_desc0);	/* set Dma-chan1's Descripter Addrress */
 	dma_cache_wback_inv((unsigned int)(dma_desc_base), (DMA_DESC_NUM)*sizeof(struct jz4760_lcd_dma_desc));
 
+#if 0
+	/* Palette Descriptor */
+	if ( lcd_info->panel.cfg & LCD_CFG_LCDPIN_SLCD )
+//		dma0_desc_palette->next_desc = (unsigned int)virt_to_phys(dma0_desc_cmd);
+		dma0_desc_palette->next_desc = (unsigned int)virt_to_phys(dma0_desc_cmd1);
+	else
+		dma0_desc_palette->next_desc = (unsigned int)virt_to_phys(dma0_desc0);
+	dma0_desc_palette->databuf = (unsigned int)virt_to_phys((void *)lcd_palette);
+	dma0_desc_palette->frame_id = (unsigned int)0xaaaaaaaa;
+	dma0_desc_palette->cmd 	= LCD_CMD_PAL | pal_size; /* Palette Descriptor */
+
+	/* Dummy Command Descriptor, cmd_num is 0 */
+	dma0_desc_cmd->next_desc = (unsigned int)virt_to_phys(dma0_desc0);
+	dma0_desc_cmd->databuf 	= (unsigned int)virt_to_phys((void *)lcd_cmdbuf);
+	dma0_desc_cmd->frame_id = (unsigned int)0x0da0cad0; /* dma0's cmd0 */
+	dma0_desc_cmd->cmd 	= LCD_CMD_CMD | 3; /* dummy command */
+	dma0_desc_cmd->offsize 	= 0; /* dummy command */
+	dma0_desc_cmd->page_width = 0; /* dummy command */
+	dma0_desc_cmd->cmd_num 	= 3;
+
+//---------------------------------
+	dma0_desc_cmd1->next_desc = (unsigned int)virt_to_phys(dma0_desc0);
+	dma0_desc_cmd1->databuf 	= 0;
+	dma0_desc_cmd1->frame_id = (unsigned int)0x0da0cad1; /* dma0's cmd0 */
+	dma0_desc_cmd1->cmd 	= LCD_CMD_CMD | 0; /* dummy command */
+	dma0_desc_cmd1->cmd_num 	= 0;
+	dma0_desc_cmd1->offsize 	= 0; /* dummy command */
+	dma0_desc_cmd1->page_width = 0; /* dummy command */
+//-----------------------------------
+	/* DMA0 Descriptor0 */
+	if ( lcd_info->panel.cfg & LCD_CFG_TVEN ) /* TVE mode */
+		dma0_desc0->next_desc = (unsigned int)virt_to_phys(dma0_desc1);
+	else{			/* Normal TFT LCD */
+		if (lcd_info->osd.fg0.bpp <= 8) /* load palette only once at setup?? */
+//			dma0_desc0->next_desc = (unsigned int)virt_to_phys(dma0_desc_palette); //tft
+			dma0_desc0->next_desc = (unsigned int)virt_to_phys(dma0_desc_cmd); // smart lcd
+		else if ( lcd_info->panel.cfg & LCD_CFG_LCDPIN_SLCD )
+			dma0_desc0->next_desc = (unsigned int)virt_to_phys(dma0_desc_cmd1);
+//			dma0_desc0->next_desc = (unsigned int)virt_to_phys(dma0_desc_cmd);
+		else
+			dma0_desc0->next_desc = (unsigned int)virt_to_phys(dma0_desc0);
+	}
+
+	dma0_desc0->databuf = virt_to_phys((void *)lcd_frame0);
+	dma0_desc0->frame_id = (unsigned int)0x0000da00; /* DMA0'0 */
+
+	/* DMA0 Descriptor1 */
+	if ( lcd_info->panel.cfg & LCD_CFG_TVEN ) { /* TVE mode */
+		if (lcd_info->osd.fg0.bpp <= 8) /* load palette only once at setup?? */
+			dma0_desc1->next_desc = (unsigned int)virt_to_phys(dma0_desc_palette);
+
+		else if ( lcd_info->panel.cfg & LCD_CFG_LCDPIN_SLCD )
+			dma0_desc1->next_desc = (unsigned int)virt_to_phys(dma0_desc_cmd);
+		else
+			dma0_desc1->next_desc = (unsigned int)virt_to_phys(dma0_desc0);
+		dma0_desc1->frame_id = (unsigned int)0x0000da01; /* DMA0'1 */
+	}
+
+	/* DMA1 Descriptor0 */
+	if ( lcd_info->panel.cfg & LCD_CFG_TVEN ) /* TVE mode */
+		dma1_desc0->next_desc = (unsigned int)virt_to_phys(dma1_desc1);
+	else			/* Normal TFT LCD */
+		dma1_desc0->next_desc = (unsigned int)virt_to_phys(dma1_desc0);
+
+	dma1_desc0->databuf = virt_to_phys((void *)lcd_frame1);
+	dma1_desc0->frame_id = (unsigned int)0x0000da10; /* DMA1'0 */
+
+	/* DMA1 Descriptor1 */
+	if ( lcd_info->panel.cfg & LCD_CFG_TVEN ) { /* TVE mode */
+		dma1_desc1->next_desc = (unsigned int)virt_to_phys(dma1_desc0);
+		dma1_desc1->frame_id = (unsigned int)0x0000da11; /* DMA1'1 */
+	}
+
+	if (lcd_info->osd.fg0.bpp <= 8) /* load palette only once at setup?? */
+		REG_LCD_DA0 = virt_to_phys(dma0_desc_palette);
+	else
+//		REG_LCD_DA0 = virt_to_phys(dma0_desc_cmd); //smart lcd
+		REG_LCD_DA0 = virt_to_phys(dma0_desc0); //tft
+	REG_LCD_DA1 = virt_to_phys(dma1_desc0);	/* set Dma-chan1's Descripter Addrress */
+	dma_cache_wback_inv((unsigned int)(dma_desc_base), (DMA_DESC_NUM)*sizeof(struct jz4760_lcd_dma_desc));
+#endif
 }
 
 static void jz4760fb_set_panel_mode( struct jz4760lcd_info * lcd_info )
@@ -2305,10 +1848,9 @@ static void jz4760fb_set_panel_mode( struct jz4760lcd_info * lcd_info )
 		lcd_info->panel.ctrl |= LCD_CTRL_BPP_8;
 	else if ( lcd_info->osd.fg0.bpp == 15 )
 		lcd_info->panel.ctrl |= LCD_CTRL_BPP_16 | LCD_CTRL_RGB555;
-	else if ( lcd_info->osd.fg0.bpp == 16 ){
-		lcd_info->panel.ctrl |= LCD_CTRL_BPP_16;
-		lcd_info->panel.ctrl &= ~LCD_CTRL_RGB555;
-	}else if ( lcd_info->osd.fg0.bpp > 16 && lcd_info->osd.fg0.bpp < 32+1 ) {
+	else if ( lcd_info->osd.fg0.bpp == 16 )
+		lcd_info->panel.ctrl |= LCD_CTRL_BPP_16 | LCD_CTRL_RGB565;
+	else if ( lcd_info->osd.fg0.bpp > 16 && lcd_info->osd.fg0.bpp < 32+1 ) {
 		lcd_info->osd.fg0.bpp = 32;
 		lcd_info->panel.ctrl |= LCD_CTRL_BPP_18_24;
 	}
@@ -2424,8 +1966,6 @@ static void jz4760fb_foreground_resize( struct jz4760lcd_info * lcd_info )
 	fg1_line_size = ((fg1_line_size+3)>>2)<<2; /* word aligned */
 	fg1_frm_size = fg1_line_size * lcd_info->osd.fg1.h;
 
-	//printk("fg1 osd x: %d y: %d w: %d h: %d\n",lcd_info->osd.fg1.x,lcd_info->osd.fg1.y,lcd_info->osd.fg1.w,lcd_info->osd.fg1.h);
-
 	if ( lcd_info->osd.fg_change ) {
 		if ( lcd_info->osd.fg_change & FG0_CHANGE_POSITION ) { /* F1 change position */
 			REG_LCD_XYP0 = lcd_info->osd.fg0.y << 16 | lcd_info->osd.fg0.x;
@@ -2445,21 +1985,12 @@ static void jz4760fb_foreground_resize( struct jz4760lcd_info * lcd_info )
 
 		if ( lcd_info->osd.fg_change & FG0_CHANGE_SIZE ) { /* change FG0 size */
 			if ( lcd_info->panel.cfg & LCD_CFG_TVEN ) { /* output to TV */
-                                //fg0_line_size = fg1_line_size;
-                                //fg0_frm_size = fg1_frm_size;
-                                dma0_desc0->cmd = dma0_desc1->cmd = (fg0_frm_size/4)/2;
+				dma0_desc0->cmd = dma0_desc1->cmd = (fg0_frm_size/4)/2;
 				dma0_desc0->offsize = dma0_desc1->offsize
 					= fg0_line_size/4;
 				dma0_desc0->page_width = dma0_desc1->page_width
 					= fg0_line_size/4;
-				#ifdef TVOUT_2x
-				if(tvout_640_480)
-				dma0_desc1->databuf = virt_to_phys((void *)(lcd_frame0 + fg0_line_size));  //maddrone
-				else
-				dma0_desc1->databuf = virt_to_phys((void *)(lcd_frame01 + fg0_line_size));  //maddrone
-				#else
 				dma0_desc1->databuf = virt_to_phys((void *)(lcd_frame0 + fg0_line_size));
-				#endif
 				REG_LCD_DA0 = virt_to_phys(dma0_desc0); //tft
 			}
 			else {
@@ -2480,7 +2011,7 @@ static void jz4760fb_foreground_resize( struct jz4760lcd_info * lcd_info )
 				dma1_desc0->offsize = dma1_desc1->offsize = fg1_line_size/4;
 				dma1_desc0->page_width = dma1_desc1->page_width = fg1_line_size/4;
 				dma1_desc1->databuf = virt_to_phys((void *)(lcd_frame1 + fg1_line_size));
-				REG_LCD_DA1 = virt_to_phys(dma1_desc0); 
+				REG_LCD_DA1 = virt_to_phys(dma0_desc1); //tft
 
 			}
 			else {
@@ -2504,8 +2035,8 @@ static void jz4760fb_change_clock( struct jz4760lcd_info * lcd_info )
 
 #if defined(CONFIG_FPGA)
 	REG_LCD_REV = 0x00000004;
-	printk("FPGA test, pixclk divide REG_LCD_REV=0x%08x\n", REG_LCD_REV);
-	printk("FPGA test, pixclk %d\n", JZ_EXTAL/(((REG_LCD_REV&0xFF)+1)*2));
+	printk("Fuwa test, pixclk divide REG_LCD_REV=0x%08x\n", REG_LCD_REV);
+	printk("Fuwa test, pixclk %d\n", JZ_EXTAL/(((REG_LCD_REV&0xFF)+1)*2));
 #else
 	unsigned int val = 0;
 	unsigned int pclk;
@@ -2525,7 +2056,6 @@ static void jz4760fb_change_clock( struct jz4760lcd_info * lcd_info )
 #ifdef CONFIG_FB_JZ4760_TVE
 	/********* In TVE mode PCLK = 27MHz ***********/
 	if ( lcd_info->panel.cfg & LCD_CFG_TVEN ) { 		/* LCDC output to TVE */
-#if 1
 //	   	__cpm_stop_tve();
 		OUTREG32(CPM_CPPCR0,((90<< CPPCR0_PLLM_LSB)|(2<<CPPCR0_PLLN_LSB)|(1<<CPPCR0_PLLOD_LSB)|(0x20<<CPPCR0_PLLST_LSB)|CPPCR0_PLLEN));	
 		REG_CPM_LPCDR  |= LPCDR_LTCS;
@@ -2551,20 +2081,10 @@ static void jz4760fb_change_clock( struct jz4760lcd_info * lcd_info )
 		__cpm_select_pixclk_tve();
 
 		REG_CPM_CPCCR |= CPCCR_CE ; /* update divide */
-#else
-		cpm_stop_clock(CGM_TVE);
-		pclk = 27000000;
-		cpm_set_clock(CGU_TVECLK,pclk);
-		cpm_start_clock(CGM_TVE);
-#endif
 	}
 	else 
 #endif
 	{ 		/* LCDC output to  LCD panel */
-                D("pll out is %d pclk is %d\n",__cpm_get_pllout2(),pclk);
-#ifdef CONFIG_JZ4760_LCD_UMIDO_L430
-        //        pclk = 22000000;
-#endif
 		val = __cpm_get_pllout2() / pclk; /* pclk */
 		val--;
 		D("ratio: val = %d\n", val);
@@ -2642,13 +2162,11 @@ static void jz4760fb_deep_set_mode( struct jz4760lcd_info * lcd_info )
 	 */
 
 	__lcd_clr_ena();	/* Quick Disable */
-
 	lcd_info->osd.fg_change = FG_CHANGE_ALL; /* change FG0, FG1 size, postion??? */
 	jz4760fb_descriptor_init(lcd_info);
 	jz4760fb_set_panel_mode(lcd_info);
 	jz4760fb_set_mode(lcd_info);
 	jz4760fb_change_clock(lcd_info);
-
 	__lcd_set_ena();	/* enable lcdc */
 }
 
@@ -2697,11 +2215,7 @@ static int jz4760_fb_suspend(struct platform_device *pdev, pm_message_t state)
 
 	screen_off();
 	//ctrl_disable();
-#if 0 //allen del
 	__lcd_clr_ena();
-#else
-	__lcd_clr_dis();
-#endif
 
 	__cpm_stop_lcd();
 
@@ -2713,6 +2227,10 @@ static int jz4760_fb_suspend(struct platform_device *pdev, pm_message_t state)
  */
 static int jz4760_fb_resume(struct platform_device *pdev)
 {
+	struct lcd_cfb_info *cfb = jz4760fb_info;
+
+	printk("%s(): called.\n", __func__);
+
 	__cpm_start_lcd();
 	screen_on();
 	__lcd_set_ena();
@@ -2725,6 +2243,212 @@ static int jz4760_fb_resume(struct platform_device *pdev)
 #define jzfb_resume       NULL
 #endif /* CONFIG_PM */
 
+/* The following routine is only for test */
+
+#if JZ_FB_DEBUG
+static void test_gpio(int gpio_num, int delay)	{
+	__gpio_as_output(gpio_num);
+	while(1) {
+		__gpio_set_pin(gpio_num);
+		udelay(delay);
+		__gpio_clear_pin(gpio_num);
+		udelay(delay);
+	}
+}
+static void display_v_color_bar(int w, int h, int bpp) {
+	int i, j, wpl, data = 0;
+	int *ptr;
+	ptr = (int *)lcd_frame0;
+//	ptr = (int *)lcd_frame1;
+	wpl = w*bpp/32;
+	if (!(bpp > 8))
+		switch(bpp){
+		case 1:
+			for (j = 0;j < h; j++)
+				for (i = 0;i < wpl; i++) {
+					*ptr++ = 0x00ff00ff;
+				}
+			break;
+		case 2:
+			for (j = 0;j < h; j++)
+				for (i = 0;i < wpl; i++) {
+					data = (i%4)*0x55555555;
+					*ptr++ = data;
+				}
+			break;
+		case 4:
+			for (j = 0;j < h; j++)
+				for (i = 0;i < wpl; i++) {
+					data = (i%16)*0x11111111;
+					*ptr++ = data;
+				}
+			break;
+		case 8:
+			for (j = 0;j < h; j++)
+				for (i = 0;i < wpl; i+=2) {
+					data = (i%(256))*0x01010101;
+					*ptr++ = data;
+					*ptr++ = data;
+				}
+			break;
+		}
+	else {
+		switch(bpp) {
+		case 16:
+			for (j = 0;j < h; j++)
+				for (i = 0;i < wpl; i++) {
+					if((i/4)%8==0)
+						*ptr++ = 0xffffffff;
+					else if ((i/4)%8==1)
+						*ptr++ = 0xf800f800;
+					else if ((i/4)%8==2)
+						*ptr++ = 0xffe0ffe0;
+					else if ((i/4)%8==3)
+						*ptr++ = 0x07e007e0;
+					else if ((i/4)%8==4)
+						*ptr++ = 0x07ff07ff;
+					else if ((i/4)%8==5)
+						*ptr++ = 0x001f001f;
+					else if ((i/4)%8==6)
+						*ptr++ = 0xf81ff81f;
+					else if ((i/4)%8==7)
+						*ptr++ = 0x00000000;
+				}
+			break;
+		case 18:
+		case 24:
+		case 32:
+		default:
+#if 1
+			for (j = 0;j < h; j++)
+				for (i = 0;i < wpl; i++) {
+					if((i/8)%8==7)
+						*ptr++ = 0xffffff;
+					else if ((i/8)%8==1)
+						*ptr++ = 0xff0000;
+					else if ((i/8)%8==2)
+						*ptr++ = 0xffff00;
+					else if ((i/8)%8==3)
+						*ptr++ = 0x00ff00;
+					else if ((i/8)%8==4)
+						*ptr++ = 0x00ffff;
+					else if ((i/8)%8==5)
+						*ptr++ = 0x0000ff;
+					else if ((i/8)%8==6)
+						*ptr++ = 0xff00ff;
+					else if ((i/8)%8==0)
+						*ptr++ = 0x000000;
+				}
+#else
+			for (j = 0;j < h; j++)
+				for (i = 0;i < wpl; i++) {
+					if((i/8)%8==7)
+						*ptr++ = 0x00ff0000;
+					else if ((i/8)%8==1)
+						*ptr++ = 0xffff0000;
+					else if ((i/8)%8==2)
+						*ptr++ = 0x20ff0000;
+					else if ((i/8)%8==3)
+						*ptr++ = 0x40ff0000;
+					else if ((i/8)%8==4)
+						*ptr++ = 0x60ff0000;
+					else if ((i/8)%8==5)
+						*ptr++ = 0x80ff0000;
+					else if ((i/8)%8==6)
+						*ptr++ = 0xa0ff0000;
+					else if ((i/8)%8==0)
+						*ptr++ = 0xc0ff0000;
+				}
+#endif
+			break;
+		}
+	}
+}
+static void display_h_color_bar(int w, int h, int bpp) {
+	int i, data = 0;
+	int *ptr;
+	int wpl; //word_per_line
+	ptr = (int *)lcd_frame0;
+//	ptr = (int *)lcd_frame1;
+	wpl = w*bpp/32;
+	if (!(bpp > 8))
+		for (i = 0;i < wpl*h;i++) {
+			switch(bpp){
+			case 1:
+				if(i%(wpl*8)==0)
+					data = ((i/(wpl*8))%2)*0xffffffff;
+					*ptr++ = data;
+				break;
+			case 2:
+				if(i%(wpl*8)==0)
+					data = ((i/(wpl*8))%4)*0x55555555;
+					*ptr++ = data;
+				break;
+			case 4:
+				if(i%(wpl*8)==0)
+					data = ((i/(wpl*8))%16)*0x11111111;
+				*ptr++ = data;
+				break;
+			case 8:
+				if(i%(wpl*8)==0)
+					data = ((i/(wpl*8))%256)*0x01010101;
+				*ptr++ = data;
+				break;
+			}
+		}
+	else {
+
+		switch(bpp) {
+		case 15:
+		case 16:
+			for (i = 0;i < wpl*h;i++) {
+				if (((i/(wpl*8)) % 8) == 0)
+					*ptr++ = 0xffffffff;
+				else if (((i/(wpl*8)) % 8) == 1)
+					*ptr++ = 0xf800f800;
+				else if (((i/(wpl*8)) % 8) == 2)
+					*ptr++ = 0xffe0ffe0;
+				else if (((i/(wpl*8)) % 8) == 3)
+					*ptr++ = 0x07e007e0;
+				else if (((i/(wpl*8)) % 8) == 4)
+					*ptr++ = 0x07ff07ff;
+				else if (((i/(wpl*8)) % 8) == 5)
+					*ptr++ = 0x001f001f;
+				else if (((i/(wpl*8)) % 8) == 6)
+					*ptr++ = 0xf81ff81f;
+				else if (((i/(wpl*8)) % 8) == 7)
+					*ptr++ = 0x00000000;
+			}
+				break;
+		case 18:
+		case 24:
+		case 32:
+		default:
+			for (i = 0;i < wpl*h;i++) {
+				if (((i/(wpl*8)) % 8) == 7)
+					*ptr++ = 0xffffff;
+				else if (((i/(wpl*8)) % 8) == 2)
+					*ptr++ = 0xff0000;
+				else if (((i/(wpl*8)) % 8) == 4)
+					*ptr++ = 0xffff00;
+				else if (((i/(wpl*8)) % 8) == 6)
+					*ptr++ = 0x00ff00;
+				else if (((i/(wpl*8)) % 8) == 1)
+					*ptr++ = 0x00ffff;
+				else if (((i/(wpl*8)) % 8) == 3)
+					*ptr++ = 0x0000ff;
+				else if (((i/(wpl*8)) % 8) == 5)
+					*ptr++ = 0x000000;
+				else if (((i/(wpl*8)) % 8) == 0)
+					*ptr++ = 0xff00ff;
+			}
+			break;
+		}
+
+	}
+
+}
+#endif
 
 /* Backlight Control Interface via sysfs
  *
@@ -2758,10 +2482,8 @@ static int screen_off(void)
 static int screen_on(void)
 {
 	struct lcd_cfb_info *cfb = jz4760fb_info;
-    if(panle_mode != PANEL_MODE_LCD_PANEL)
-      return 0;
-	//__lcd_display_on();//allen del
 
+	__lcd_display_on();
 
 	/* Really restore LCD backlight when LCD backlight is turned on. */
 	if (cfb->backlight_level) {
@@ -2778,28 +2500,6 @@ static int screen_on(void)
 
 	return 0;
 }
-
-static int screen_on_new(void)
-{
-	struct lcd_cfb_info *cfb = jz4760fb_info;
-	//__lcd_display_on();  //allen del
-
-	/* Really restore LCD backlight when LCD backlight is turned on. */
-	if (cfb->backlight_level) {
-#ifdef HAVE_LCD_PWM_CONTROL
-		if (!cfb->b_lcd_pwm) {
-			__lcd_pwm_start();
-			cfb->b_lcd_pwm = 1;
-		}
-#endif
-		__lcd_set_backlight_level(cfb->backlight_level);
-	}
-
-	cfb->b_lcd_display = 1;
-
-	return 0;
-}
-
 
 static int jz4760fb_set_backlight_level(int n)
 {
@@ -2900,26 +2600,29 @@ static int jz4760fb_device_attr_unregister(struct fb_info *fb_info)
 
 static void gpio_init(void)
 {
-	__lcd_display_pin_init();  //LCD REST
-	if (jz4760_lcd_info->panel.cfg & LCD_CFG_LCDPIN_SLCD)
-		__gpio_as_lcd_8bit();
-	else if (jz4760_lcd_info->panel.cfg & LCD_CFG_MODE_SERIAL_TFT)
-	{ //__gpio_as_lcd_8bit no use lcd_de
-		REG_GPIO_PXFUNS(2) = 0x000c31fc;
-		REG_GPIO_PXTRGC(2) = 0x000c31fc;
-		REG_GPIO_PXSELC(2) = 0x000c31fc;
-		REG_GPIO_PXPES(2)  = 0x000c31fc;
-	}
+	__lcd_display_pin_init();
+
+	/* gpio init __gpio_as_lcd */
+	if (jz4760_lcd_info->panel.cfg & LCD_CFG_MODE_TFT_16BIT)
+		__gpio_as_lcd_16bit();
+	else if (jz4760_lcd_info->panel.cfg & LCD_CFG_MODE_TFT_24BIT)
+		__gpio_as_lcd_24bit();
 	else
-	{
-		/* gpio init __gpio_as_lcd */
-		if (jz4760_lcd_info->panel.cfg & LCD_CFG_MODE_TFT_16BIT)
-			__gpio_as_lcd_16bit();
-		else if (jz4760_lcd_info->panel.cfg & LCD_CFG_MODE_TFT_24BIT)
-			__gpio_as_lcd_24bit();
-		else
-	 		__gpio_as_lcd_18bit();
+ 		__gpio_as_lcd_18bit();
+
+	/* In special mode, we only need init special pin,
+	 * as general lcd pin has init in uboot */
+#if defined(CONFIG_SOC_JZ4760)
+	switch (jz4760_lcd_info->panel.cfg & LCD_CFG_MODE_MASK) {
+	case LCD_CFG_MODE_SPECIAL_TFT_1:
+	case LCD_CFG_MODE_SPECIAL_TFT_2:
+	case LCD_CFG_MODE_SPECIAL_TFT_3:
+		__gpio_as_lcd_special();
+		break;
+	default:
+		;
 	}
+#endif
 
 	return;
 }
@@ -2936,6 +2639,9 @@ static void set_bpp_to_ctrl_bpp(void)
 			break;
 
 		default:
+			E("FG0: BPP (%d) not support, Set BPP 32.\n",
+					jz4760_lcd_info->osd.fg0.bpp);
+
 			jz4760_lcd_info->osd.fg0.bpp = 32;
 			break;
 	}
@@ -2950,6 +2656,9 @@ static void set_bpp_to_ctrl_bpp(void)
 			break;
 
 		default:
+			E("FG1: BPP (%d) not support, Set BPP 32.\n",
+					jz4760_lcd_info->osd.fg1.bpp);
+
 			jz4760_lcd_info->osd.fg1.bpp = 32;
 			break;
 	}
@@ -2963,197 +2672,18 @@ static void slcd_init(void)
 #if defined(CONFIG_FB_JZ4760_SLCD)
 	__lcd_as_smart_lcd();
 	__slcd_disable_dma();
-#endif
-}
-
-static void open_ausd_me()
-{
-#ifdef HP_POWER_EN
-	__gpio_as_func0(HP_POWER_EN);
-	__gpio_as_output(HP_POWER_EN);
-	__gpio_enable_pull(HP_POWER_EN);
-
- #ifdef EARPHONE_DETE
-	if(__gpio_get_pin(EARPHONE_DETE) != DETE_ACTIV_LEVEL)
-		if (l009_globle_volume)
-		__gpio_set_pin(HP_POWER_EN);
-	else
-		__gpio_clear_pin(HP_POWER_EN);
- #else
-	if (l009_globle_volume)
-		__gpio_set_pin(HP_POWER_EN);
-
- #endif
-#endif
-}
-
-static void close_ausd_me()
-{
-#ifdef HP_POWER_EN
-	__gpio_as_func0(HP_POWER_EN);
-	__gpio_as_output(HP_POWER_EN);
-	__gpio_clear_pin(HP_POWER_EN);
-#endif
-}
-
-void clear_tv_framebuff(void)
-{
-	memset(lcd_frame0,0,640*480*2);
-}
-
-void clear_framebuff(void)
-{
-	memset(lcd_frame0,0,LCD_SCREEN_W*LCD_SCREEN_H*2);
-}
-
-
-int get_tvout_flag(void)
-{
-	return tvout_flag;
-}
-EXPORT_SYMBOL(get_tvout_flag);
-
-
-#ifdef  AV_OUT_DETE
-void avout_ack_timer(unsigned long data)
-{
-
-	int tmp_flag = 0;
-
-	if(__gpio_get_pin(AV_OUT_DETE) != 0)
-	{
-		tmp_flag = 0;
-		panle_mode = 0;
-		open_ausd_me();
-	}
-  	else
-  	{
-		panle_mode = 1;
-		if (tvout_flag2 == 2)
-			tmp_flag = 2;
-		else if (tvout_flag2 == 3)
-			tmp_flag = 3;
-		else
-			tmp_flag = 1;
-
-	    /* close ausd */
-	    close_ausd_me();
-  	}
-
-	//printk("avout_ack_time tvout_flag %d,tmp_flag %d,tvout_flag2 %d \n",tvout_flag,tmp_flag,tvout_flag2);
-
-	if(tvout_flag==0  && tmp_flag==1)	//lcd to pal
-	{
-		jz4760lcd_info_switch_to_TVE(PANEL_MODE_TVE_NTSC);
-		jz4760tve_init(PANEL_MODE_TVE_NTSC); /* tve controller init */
-		udelay(100);
-		cpm_start_clock(CGM_TVE);
-		jz4760tve_enable_tve();
-		/* turn off lcd backlight */
-		__lcd_display_off();
-        tvout_640_480 = 0;
-		jz4760fb_deep_set_mode(jz4760_lcd_info);
-		//fb_resize_start();
-
-		ipu_driver_open_tv(320,240,320,480);
-
-
-		printk("1231\n");
-	}
-	else if((tvout_flag==1 || tvout_flag == 2) && tmp_flag==0)  //tvout to lcd
-	{
-		if (tvout_flag == 2){
-			clear_tv_framebuff();
-		}
-
-		jz4760tve_disable_tve();
-		cpm_stop_clock(CGM_TVE);
-		udelay(100);
-		jz4760_lcd_info = &jz4760_lcd_panel;
-		/* turn off lcd backlight */
-		tvout_640_480 = 0;
-		jz4760fb_deep_set_mode(jz4760_lcd_info);
-		resize_go_out = 1;
-		__lcd_slcd_special_on();
-
-		if (tvout_flag == 1)
-			ipu_driver_close_tv();
-
-		if (tvout_flag == 1){
-			if (lcd_a320_flag > 0){
-				memset(lcd_frame0,0x00,LCD_SCREEN_W*LCD_SCREEN_H*2);
-				memset(lcd_frame01,0x00,640*480*2);
-				dma0_desc0->databuf = virt_to_phys((void *)lcd_frame01);
-			}
-			mdelay(1000);
-		}
-		screen_on();
-		//__lcd_display_on();
-		//__lcd_set_backlight_level(backlight_value);	/* We support 8 levels here. */
-	}
-	else if(tvout_flag==1 && tmp_flag==2)  //tvout_2x to tvout_640x480
-	{
-			clear_framebuff();
-			resize_go_out = 1;
-			mdelay(500);
-			tvout_640_480 = 1;
-			jz4760fb_deep_set_mode(jz4760_lcd_info);
-	}
-	else if(tvout_flag==2 && tmp_flag==1)  //tvout_640x480 to tvout_2x
-	{
-			//fb_resize_start();
-			clear_tv_framebuff();
-			tvout_640_480 = 0;
-			jz4760fb_deep_set_mode(jz4760_lcd_info);
-	}
-	else if(tvout_flag==0 && tmp_flag==2)  //tvout_2x to tvout_640x480
-	{
-		jz4760lcd_info_switch_to_TVE(PANEL_MODE_TVE_NTSC);
-		jz4760tve_init(PANEL_MODE_TVE_NTSC); /* tve controller init */
-		udelay(100);
-		cpm_start_clock(CGM_TVE);
-		jz4760tve_enable_tve();
-		/* turn off lcd backlight */
-		__lcd_display_off();
-		tvout_640_480 = 1;
-		resize_go_out = 1;
-		jz4760fb_deep_set_mode(jz4760_lcd_info);
-
-	}
-	else if (tvout_flag == 0 && tmp_flag == 3)
-	{
-	//	__lcd_display_off();
-
-	}else if (tvout_flag == 3 && tmp_flag == 0){
-	//	screen_on();
-	}
-
-	if (tvout_flag != tmp_flag)
-		tvout_flag = tmp_flag;
-}
-
-static irqreturn_t avout_pnp_irq(int irq, void *dev_id)
-{
-
- // /* mask interrupt */
-  //__gpio_mask_irq(AV_OUT_DETE);
-
-  //printk("avout dete irq ............ \n");
-  avout_irq_timer.expires = jiffies + 1*HZ;
-  del_timer(&avout_irq_timer);
-  add_timer(&avout_irq_timer);
-  __gpio_unmask_irq(AV_OUT_DETE);
-  return IRQ_HANDLED;
-}
+	__init_slcd_bus();	/* Note: modify this depend on you lcd */
 
 #endif
+	return;
+}
 
 static int __devinit jz4760_fb_probe(struct platform_device *dev)
 {
 	struct lcd_cfb_info *cfb;
 
-    int rv = 0;
-    cpm_start_clock(CGM_IPU);
+	int rv = 0;
+
 	cfb = jz4760fb_alloc_fb_info();
 	if (!cfb)
 		goto failed;
@@ -3167,7 +2697,7 @@ static int __devinit jz4760_fb_probe(struct platform_device *dev)
 	set_bpp_to_ctrl_bpp();
 
 	/* init clk */
-	//jz4760fb_change_clock(jz4760_lcd_info); //Lcd parame
+	jz4760fb_change_clock(jz4760_lcd_info);
 
 	rv = jz4760fb_map_smem(cfb);
 	if (rv)
@@ -3186,90 +2716,21 @@ static int __devinit jz4760_fb_probe(struct platform_device *dev)
 
 	jz4760fb_device_attr_register(&cfb->fb);
 
-	if (request_irq(IRQ_LCD, jz4760fb_interrupt_handler, IRQF_DISABLED,"lcd", 0))
-	{
+	if (request_irq(IRQ_LCD, jz4760fb_interrupt_handler, IRQF_DISABLED,
+				"lcd", 0)) {
 		D("Faield to request LCD IRQ.\n");
 		rv = -EBUSY;
 		goto failed;
 	}
 
 	ctrl_enable();
+	screen_on();
 
-	__lcd_display_on();
-	//fill black
-#if defined(RGB_TEST)
-	int i = 0;
-	unsigned short*ptr;
-	ptr = (unsigned short*)lcd_frame0;
+#if JZ_FB_DEBUG
+	display_h_color_bar(jz4760_lcd_info->osd.fg0.w, jz4760_lcd_info->osd.fg0.h, jz4760_lcd_info->osd.fg0.bpp);
 
-	for(i = 0 ; i < LCD_SCREEN_W*LCD_SCREEN_H/3; i++)
-	{
-		*ptr++ = 0xf800;
-	}
-	
-	for(i = 0 ; i < LCD_SCREEN_W*LCD_SCREEN_H/3; i++)
-	{
-		*ptr++ = 0x07e0;
-	}
-	
-	for(i = 0 ; i < LCD_SCREEN_W*LCD_SCREEN_H/3; i++)
-	{
-		*ptr++ = 0x001f;
-	}
-	
-	dma_cache_wback((unsigned int)lcd_frame0, LCD_SCREEN_W * LCD_SCREEN_H * 2);
-	mdelay(3000);
-#else
-	memset(lcd_frame0, 0x00, LCD_SCREEN_W * LCD_SCREEN_W * 2);
-	dma_cache_wback((unsigned int)lcd_frame0, LCD_SCREEN_W * LCD_SCREEN_W * 2);
-	mdelay(50);	//needed to avoid flash white screen
-
+	print_lcdc_registers();
 #endif
-	/* Really restore LCD backlight when LCD backlight is turned on. */
-	if (cfb->backlight_level) {
-#ifdef HAVE_LCD_PWM_CONTROL
-		if (!cfb->b_lcd_pwm) {
-			__lcd_pwm_start();
-			cfb->b_lcd_pwm = 1;
-		}
-#endif
-		__lcd_set_backlight_level(cfb->backlight_level);
-	}
-
-	cfb->b_lcd_display = 1;
-
-#ifdef AV_OUT_DETE
-        init_timer(&avout_irq_timer);
-        avout_irq_timer.function = avout_ack_timer;
-        avout_irq_timer.data = 0;
-        avout_irq_timer.expires = jiffies + 2*HZ;
-        add_timer(&avout_irq_timer);
-
-        __gpio_as_func0(AV_OUT_DETE);
-        __gpio_as_input(AV_OUT_DETE);
-        __gpio_disable_pull(AV_OUT_DETE);
-
-		printk("\n.................\n");
-
-
-        if(__gpio_get_pin(AV_OUT_DETE) != 0)
-        {
-          	__gpio_as_irq_fall_edge(AV_OUT_DETE);
-        }
-        else
-        {
-          	__gpio_as_irq_rise_edge(AV_OUT_DETE);
-        }
-        int ret;
-        ret = request_irq(AV_OUT_DETE_IRQ, avout_pnp_irq,
-            IRQF_DISABLED, "avout_pnp", NULL);
-        if (ret) {
-          printk("%s %d Could not get avout irq %d\n",__FILE__,__LINE__, AV_OUT_DETE_IRQ);
-          return ret;
-        }
-		printk("\n........xxx........\n");
-#endif
-
 
 	return 0;
 
@@ -3282,10 +2743,6 @@ failed:
 
 static int __devexit jz4760_fb_remove(struct platform_device *pdev)
 {
-	struct lcd_cfb_info *cfb = jz4760fb_info;
-
-	jz4760fb_device_attr_unregister(&cfb->fb);
-
 	return 0;
 }
 
@@ -3299,470 +2756,10 @@ static struct platform_driver jz4760_fb_driver = {
 		.owner = THIS_MODULE,
 	},
 };
-static int proc_lcd_flush_write_proc(
-			struct file *file, const char *buffer,
-			unsigned long count, void *data)
-{
-	unsigned int framebuffer_size;
-
-	return count;
-	
-  	//printk("%s %d\n",__FILE__,tvout_flag);
-  if(tvout_flag == 0)
-  {
-    lcd_flush_flag =  simple_strtoul(buffer, 0, 10);
-
-    //printk("%s %d  lcd_flush_flag is %d\n",__FILE__,__LINE__,lcd_flush_flag);
-  
-    framebuffer_size = jz4760_lcd_info->panel.w*jz4760_lcd_info->panel.h*(jz4760_lcd_info->osd.fg0.bpp/8);
-    if(lcd_flush_flag == 1)  //start flush	
-    { 
-      D("\n");
-      //memcpy(lcd_frame0,lcd_frame01,framebuffer_size);
-      D("\n");
-      //mdelay(500);
-      D("\n");
-      //dma_cache_wback((unsigned int)(lcd_frame0),framebuffer_size);
-      dma0_desc0->databuf = virt_to_phys((void *)lcd_frame0);
-    }
-    else
-    {
-      D("\n");
-      memcpy(lcd_frame01,lcd_frame0,framebuffer_size);
-      D("\n");
-      //mdelay(500);
-      D("\n");
-      dma_cache_wback((unsigned int)(lcd_frame01),framebuffer_size);
-      dma0_desc0->databuf = virt_to_phys((void *)lcd_frame01);
-    }
-    //jz4750fb_deep_set_mode(jz4750_lcd_info);
-  }
-  
-  return count;
-}
-static int proc_lcd_flush_read_proc(
-			char *page, char **start, off_t off,
-			int count, int *eof, void *data)
-{
-	return sprintf(page, "%u\n", panle_mode);
-}
-
-static int proc_lcd_backlight_read_proc(
-			char *page, char **start, off_t off,
-			int count, int *eof, void *data)
-{
-	return sprintf(page, "%u\n", backlight_value);
-}
-
-static int proc_lcd_backlight_write_proc(
-			struct file *file, const char *buffer,
-			unsigned long count, void *data)
-{
-    if (tvout_flag)
-        return count;
-
-	backlight_value =  simple_strtoul(buffer, 0, 10);
-	//printk("backlight_value is %d \n",backlight_value);
-	if(backlight_value == 0)
-	{
-		__gpio_clear_pin(GPIO_LCD_VCC_EN_N);
-		__lcd_close_backlight();
-
-		//__gpio_clear_pin(GPIO_TP_VCC_EN); //allen add for touch
-	}
-	else
-	{
-		__gpio_set_pin(GPIO_LCD_VCC_EN_N);
-		__lcd_set_backlight_level(backlight_value);
-
-		//__gpio_set_pin(GPIO_TP_VCC_EN); //allen add for touch
-	}
-	return count;
-}
-
-#define GPIO_WIFI_PW (32*5+7) //(32*3+3)
-static int wifi_pw_on_flag = 0;
-static int proc_wifi_read_proc(
-			char *page, char **start, off_t off,
-			int count, int *eof, void *data)
-{
-	return sprintf(page, "%lu\n", wifi_pw_on_flag);
-}
-
-
-static int proc_wifi_write_proc(
-		struct file *file, const char *buffer,
-		unsigned long count, void *data)
-{
-
-	wifi_pw_on_flag =  simple_strtoul(buffer, 0, 10);
-	printk("\n wifi pw flag = %d\n",wifi_pw_on_flag);
-	__gpio_as_func0(GPIO_WIFI_PW);
-	__gpio_as_output(GPIO_WIFI_PW);
-	if (wifi_pw_on_flag){
-		__gpio_set_pin(GPIO_WIFI_PW);
-	}else{
-		__gpio_clear_pin(GPIO_WIFI_PW);
-	}
-
-	return count;
-}
-
-//============ allen add ===================
-int app_set_tv_flag =0;
-int old_tv_flag;
-static void allen_tv_out()
-{
-	int tmp_flag = 0;
-	
-	//printk("%s %d %d\n",__func__,__LINE__,app_set_tv_flag);
-
-    if(0 == app_set_tv_flag)
-    {
-	    tmp_flag = 0;
-
-		panle_mode = 0;
-		old_tv_flag = 0;
-	    open_ausd_me();
-    }
-  	else
-  	{
-		panle_mode = 1;
-	   	tmp_flag = 1;
-	    close_ausd_me();
-  	}
-
-	if((old_tv_flag !=app_set_tv_flag) && tmp_flag)	//lcd to pal
-	{
-		if(old_tv_flag)
-		{
-			ipu_driver_close_tv();
-			jz4760tve_disable_tve();
-			cpm_stop_clock(CGM_TVE);
-			udelay(100);
-
-			memset(lcd_frame0,0x00,LCD_SCREEN_W*LCD_SCREEN_H*2);
-			memset(lcd_frame01,0x00,640*480*2);
-
-			mdelay(5000);
-		}
-
-		old_tv_flag = app_set_tv_flag;
-
-		if(1 == app_set_tv_flag)
-		{
-			jz4760lcd_info_switch_to_TVE(PANEL_MODE_TVE_PAL);
-			jz4760tve_init(PANEL_MODE_TVE_PAL); /* tve controller init */
-			printk("entern PAL ...\n");
-		}
-		else
-		{
-			jz4760lcd_info_switch_to_TVE(PANEL_MODE_TVE_NTSC);
-			jz4760tve_init(PANEL_MODE_TVE_NTSC); /* tve controller init */
-			printk("entern NTSC ...\n");
-		}
-		udelay(100);
-
-		cpm_start_clock(CGM_TVE);
-		jz4760tve_enable_tve();
-		__lcd_display_off();
-        tvout_640_480 = 0;
-		jz4760fb_deep_set_mode(jz4760_lcd_info);
-
-		ipu_driver_open_tv(LCD_SCREEN_W,LCD_SCREEN_H,640,480);
-
-	}
-	else if((tvout_flag==1 || tvout_flag == 2) && tmp_flag==0)  //tvout to lcd
-	{
-		printk("tv_out exit to lcd\n");
-		if (tvout_flag == 2)
-			clear_tv_framebuff();
-
-		jz4760tve_disable_tve();
-		cpm_stop_clock(CGM_TVE);
-		udelay(100);
-		jz4760_lcd_info = &jz4760_lcd_panel;
-		tvout_640_480 = 0;
-		jz4760fb_deep_set_mode(jz4760_lcd_info);
-		resize_go_out = 1;
-		__lcd_slcd_special_on();
-
-		if (tvout_flag == 1)
-			ipu_driver_close_tv();
-
-		if (tvout_flag == 1){
-			if (lcd_a320_flag > 0){
-				memset(lcd_frame0,0x00,LCD_SCREEN_W*LCD_SCREEN_H*2);
-				memset(lcd_frame01,0x00,640*480*2);
-				dma0_desc0->databuf = virt_to_phys((void *)lcd_frame01);
-			}
-			mdelay(1000);
-		}
-	#if 0 //allen del
-		screen_on();
-		//__lcd_display_on();
-	#else
-		clear_framebuff();
-		__lcd_set_backlight_level(backlight_value);
-		//printk("backlight_value is %d \n",backlight_value);
-	#endif
-	}
-
-	if (tvout_flag != tmp_flag)
-		tvout_flag = tmp_flag;
-}
-
-static int proc_tvselect_read_proc(
-			char *page, char **start, off_t off,
-			int count, int *eof, void *data)
-{
-	return sprintf(page, "%lu\n", app_set_tv_flag);
-}
-
-static int proc_tvselect_write_proc(struct file *file, const char *buffer,
-			unsigned long count, void *data)
-{
-	app_set_tv_flag = simple_strtoul(buffer, 0, 10);
-	//printk("app_set_tv_flag is %d \n",app_set_tv_flag);
-	allen_tv_out();
-	return count;
-}
-
-static int fb_resize_a320_original_thread(void *unused)
-{
-	printk("kernel frame buffer fb_resize_a320_original_thread start!\n");
-
-	while(1)
-	{
-		set_current_state(TASK_INTERRUPTIBLE);
-		schedule_timeout(HZ/20);
-		fb_a320_thread(320,240,LCD_SCREEN_W,LCD_SCREEN_H,A320_ORIGINAL);
-		if(resize_a320_go_out)
-		break;
-	}
-	resize_a320_original_task = 0;
-
-}
-static void fb_resize_a320_original_start()
-{
-	if (resize_a320_original_task != 0)
-		return;
-	resize_a320_go_out= 0;
-	resize_a320_original_task= kthread_run(fb_resize_a320_original_thread, NULL, "fb_a320_original");
-	if(IS_ERR(resize_a320_original_task))
-	{
-		printk("Kernel fb_a320_originalstart error!\n");
-		return;
-	}
-}
-static int fb_resize_a320_fullscreen_thread(void *unused)
-{
-  printk("kernel frame buffer resize thread start!\n");
-  while(1)
-  {
-    set_current_state(TASK_INTERRUPTIBLE);
-    schedule_timeout(HZ/20);
-    fb_a320_thread(320,240,LCD_SCREEN_W,LCD_SCREEN_H,A320_FULLSCREEN);
-    if(resize_a320_go_out)
-      break;
-  }
-	resize_a320_full_screen_task = 0;
-}
-static void fb_resize_a320_fullscreen_start()
-{
-	if (resize_a320_full_screen_task != 0)
-		return;
-	resize_a320_go_out = 0;
-	resize_a320_full_screen_task = kthread_run(fb_resize_a320_fullscreen_thread, NULL, "fb_a320_fullscreen");
-	if(IS_ERR(resize_a320_full_screen_task))
-	{
-		printk("Kernel fb_a320_fullscreen start error!\n");
-		return;
-	}
-}
-
-static int proc_lcd_a320_read_proc(
-			char *page, char **start, off_t off,
-			int count, int *eof, void *data)
-{
-	return sprintf(page, "%lu\n", lcd_a320_flag);
-}
-
-static int proc_lcd_a320_write_proc(
-			struct file *file, const char *buffer,
-			unsigned long count, void *data)
-{
-  int tmp_a320_flag;
-
-  tmp_a320_flag =  simple_strtoul(buffer, 0, 10);
-
-  if (tmp_a320_flag != lcd_a320_flag){
-	  lcd_a320_flag = tmp_a320_flag;
-  }else{
-	  return count;
-  }
-
-  if(lcd_a320_flag == 0)
-  {
-	  resize_a320_go_out = 1;
-	  if (!tvout_flag)
-	  	dma0_desc0->databuf = virt_to_phys((void *)lcd_frame0);
-  }
-  else if(lcd_a320_flag == 1)
-  {
-	  resize_a320_go_out = 1;
-	  memset(lcd_frame0,0x00,LCD_SCREEN_W*LCD_SCREEN_H*2);
-	  memset(lcd_frame01,0x00,LCD_SCREEN_W*LCD_SCREEN_H*2);
-	  dma0_desc0->databuf = virt_to_phys((void *)lcd_frame01);
-	  fb_resize_a320_original_start();
-  }
-  else if(lcd_a320_flag == 2)
-  {
-	  resize_a320_go_out = 1;
-	  memset(lcd_frame0,0x00,LCD_SCREEN_W*LCD_SCREEN_H*2);
-	  memset(lcd_frame01,0x00,LCD_SCREEN_W*LCD_SCREEN_H*2);
-	  dma0_desc0->databuf = virt_to_phys((void *)lcd_frame01);
-	  fb_resize_a320_fullscreen_start();
-  }
-  return count;
-}
-
-static int proc_tvout_read_proc(
-			char *page, char **start, off_t off,
-			int count, int *eof, void *data)
-{
-	return sprintf(page, "%u\n", tvout_flag);
-}
-
-//when display in tvout,this proc called
-static int proc_tvout_write_proc(
-			struct file *file, const char *buffer,
-			unsigned long count, void *data)
-{
-	tvout_flag2 =  simple_strtoul(buffer, 0, 10);
-
-	if ((tvout_flag == 1) && (tvout_flag2 == 2))
-	{
-		resize_go_out = 1;
-		clear_framebuff();
-		mdelay(500);
-		tvout_640_480 = 1;
-		jz4760fb_deep_set_mode(jz4760_lcd_info);
-		tvout_flag = 2;
-
-		ipu_driver_close_tv();
-	}
-	else if ((tvout_flag == 2) && (tvout_flag2 == 0 || tvout_flag2 == 1))
-	{
-		clear_tv_framebuff();
-		tvout_640_480 = 0;
-		jz4760fb_deep_set_mode(jz4760_lcd_info);
-		tvout_flag = 1;
-
-		ipu_driver_open_tv(LCD_SCREEN_W,LCD_SCREEN_H,640,480);
-	}
-
-	//cim no suppor tvout!
-	if (tvout_flag2 == 3 && tvout_flag == 1)
-	{
-		jz4760tve_disable_tve();
-		cpm_stop_clock(CGM_TVE);
-		udelay(100);
-		jz4760_lcd_info = &jz4760_lcd_panel;
-		/* turn off lcd backlight */
-		tvout_640_480 = 0;
-		jz4760fb_deep_set_mode(jz4760_lcd_info);
-		resize_go_out = 1;
-		__lcd_slcd_special_on();
-		ipu_driver_close_tv();
-
-		if (tvout_flag == 1)
-			mdelay(1000);
-		screen_on_new();
-
-		tvout_flag = 3;
-	}
-
-	if (tvout_flag2 == 1 && tvout_flag == 3)
-	{
-		if(1 == app_set_tv_flag)
-		{
-			jz4760lcd_info_switch_to_TVE(PANEL_MODE_TVE_PAL);
-			jz4760tve_init(PANEL_MODE_TVE_PAL); /* tve controller init */
-		}
-		else
-		{
-			jz4760lcd_info_switch_to_TVE(PANEL_MODE_TVE_NTSC);
-			jz4760tve_init(PANEL_MODE_TVE_NTSC); /* tve controller init */
-		}
-		udelay(100);
-		cpm_start_clock(CGM_TVE);
-		jz4760tve_enable_tve();
-		/* turn off lcd backlight */
-		__lcd_display_off();
-		tvout_640_480 = 0;
-		jz4760fb_deep_set_mode(jz4760_lcd_info);
-
-		ipu_driver_open_tv(LCD_SCREEN_W,LCD_SCREEN_H,640,480);
-
-		tvout_flag = 1;
-	}
-
-	return count;
-}
 
 static int __init jz4760_fb_init(void)
 {
-	struct proc_dir_entry *res;
-
-	//app maybe mode jz4760_lcd_panel.osd.fg0,so use global  Variable
-	LCD_SCREEN_W = jz4760_lcd_panel.panel.w;
-	LCD_SCREEN_H = jz4760_lcd_panel.panel.h;//allen add
-
-	res = create_proc_entry("jz/lcd_backlight", 0, NULL);
-	if(res)
-	{
-		res->read_proc = proc_lcd_backlight_read_proc;
-		res->write_proc = proc_lcd_backlight_write_proc;
-	}
-
-	res = create_proc_entry("jz/tvout", 0, NULL);
-	if(res)
-	{
-		res->read_proc = proc_tvout_read_proc;
-		res->write_proc = proc_tvout_write_proc;
-	}
-	res = create_proc_entry("jz/lcd_flush", 0, NULL);
-	if(res)
-	{
-		res->read_proc = proc_lcd_flush_read_proc;
-		res->write_proc = proc_lcd_flush_write_proc;
-	}
-
-	res = create_proc_entry("jz/wifi_pw", 0, NULL);
-	if(res)
-	{
-		res->read_proc = proc_wifi_read_proc;
-		res->write_proc = proc_wifi_write_proc;
-		res->data = NULL;
-	}
-
-	res = create_proc_entry("jz/lcd_a320", 0, NULL);
-	if(res)
-	{
-		res->read_proc = proc_lcd_a320_read_proc;
-		res->write_proc = proc_lcd_a320_write_proc;
-		res->data = NULL;
-	}
-	res = create_proc_entry("jz/tvselect", 0, NULL);
-	if(res)
-	{
-		res->data = NULL;
-		res->read_proc = proc_tvselect_read_proc;
-		res->write_proc = proc_tvselect_write_proc;
-	}
-
-  	return platform_driver_register(&jz4760_fb_driver);
+	return platform_driver_register(&jz4760_fb_driver);
 }
 
 static void __exit jz4760_fb_cleanup(void)
@@ -3770,11 +2767,5 @@ static void __exit jz4760_fb_cleanup(void)
 	platform_driver_unregister(&jz4760_fb_driver);
 }
 
-
 module_init(jz4760_fb_init);
 module_exit(jz4760_fb_cleanup);
-
-MODULE_DESCRIPTION("Jz4760 LCD Controller driver");
-MODULE_AUTHOR("Wolfgang Wang, <lgwang@ingenic.cn>");
-MODULE_LICENSE("GPL");
-

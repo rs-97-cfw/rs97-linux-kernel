@@ -108,7 +108,7 @@ static int proc_alt_write_proc(
 
 
 //------------------------------------
-extern void fb_resize_start();
+// extern void fb_resize_start();
 
 static void jz_kbd_poll (struct input_polled_dev *dev)
 {	
@@ -129,7 +129,7 @@ static void jz_kbd_poll (struct input_polled_dev *dev)
 	}
 
 	//tvout  flush!
-	fb_resize_start();  //medive change
+	//fb_resize_start();  //medive change
 	
 
 #if 0 //adc key

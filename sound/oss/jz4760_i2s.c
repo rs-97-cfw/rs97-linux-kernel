@@ -201,7 +201,7 @@ static mm_segment_t old_fs;
 #endif
 
 
-extern unsigned int panle_mode;
+// extern unsigned int panle_mode;
 
 /*
  * Debug functions
@@ -1476,10 +1476,10 @@ static int jz_i2s_ioctl_mixdev(struct inode *inode, struct file *file, unsigned 
         #ifdef EARPHONE_DETE
           if(__gpio_get_pin(EARPHONE_DETE) != DETE_ACTIV_LEVEL)  //HP OFF
           {
-		  	if(!panle_mode)
+		  	//if(!panle_mode)
            		__gpio_set_pin(HP_POWER_EN);
-			else
-				__gpio_clear_pin(HP_POWER_EN);
+			// else
+				// __gpio_clear_pin(HP_POWER_EN);
           }
 		#else
 			__gpio_set_pin(HP_POWER_EN);
@@ -2658,10 +2658,10 @@ void jz4760b_i2s_set_internal_codec(void)
   #ifdef EARPHONE_DETE
 	if(__gpio_get_pin(EARPHONE_DETE) != DETE_ACTIV_LEVEL)
 	{
-		if(!panle_mode)
+		//if(!panle_mode)
 			__gpio_set_pin(HP_POWER_EN);
-		else
-			__gpio_clear_pin(HP_POWER_EN);
+		// else
+			// __gpio_clear_pin(HP_POWER_EN);
 	}
 	else
 		__gpio_clear_pin(HP_POWER_EN);

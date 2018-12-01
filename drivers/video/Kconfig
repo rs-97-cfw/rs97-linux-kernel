@@ -9,8 +9,6 @@ source "drivers/char/agp/Kconfig"
 
 source "drivers/gpu/drm/Kconfig"
 
-source "drivers/gpu/vivante/Kconfig"
-
 config VGASTATE
        tristate
        default n
@@ -504,7 +502,7 @@ endchoice
 
 config FB_JZ4760_LCD
 	tristate "JZ4760 LCD Controller support"
-	depends on FB_JZSOC && (SOC_JZ4760 || SOC_JZ4760B || SOC_JZ4770)
+	depends on FB_JZSOC && (SOC_JZ4760 || SOC_JZ4760B)
 	---help---
 	   JZ4760 LCD Controller driver.
 	   JZ4760 LCD Controller support OSD function(refer jz4760_lcdc_spec.pdf).JZ4760 LCD OSD implement 2 framebuffer layers: foreground0 and foreground1. JZ4760 LCD driver support only foreground0 default.
@@ -526,11 +524,6 @@ config JZ4760_HDMI_DISPLAY
 	depends on FB_JZSOC && FB_JZ4760_LCD
 	default n
 
-config JZ4760_IPU
-	bool "JZ4760 IPU support"
-	depends on FB_JZSOC
-	default n
-
 config JZ4760_IPU_MM
 	tristate "JZ4760 IPU MM support"
 	depends on FB_JZSOC && FB_JZ4760_LCD
@@ -544,24 +537,6 @@ config FB_JZ4760_SLCD
 	bool
 	depends on FB_JZ4760_LCD
 	default n
-
-config FB_JZ_LVDS
-	bool
-	depends on FB_JZ4760_LCD
-	default n
-
-config JZ4760_VGA_DISPLAY
-	bool
-	depends on FB_JZ4760_LCD
-	default n
-
-config JZLCD_PIXCLK_GET_FROM_PLL0
-	bool "LCD Pixel Clock Get From PLL0"
-	depends on FB_JZ4760_LCD
-	default n
-	---help---
-	    Select LCD Pixel Clock Source From PLL0 or PLL1,  PLL1 default.
-
 choice
 	depends on FB_JZ4760_LCD
 	prompt "JZ4760 LCD Panels Support"
@@ -590,12 +565,6 @@ config JZ4760_LCD_TOPPOLY_TD025THEA7_RGB_DELTA
 config JZ4760_LCD_TOPPOLY_TD043MGEB1
 	bool "TOPPOLY_TD043MGEB1 TFT panel(800x480)(24bit mode)"
 
-config JZ4760_LCD_UMIDO_L430
-	bool "UMIDO_L430 TFT panel(480x272)(24bit mode)"
-	
-config JZ4760_LCD_TM370_LN430_9
-	bool "TM370_LN430_9 TFT panel(480x320)(18bit mode)"
-
 config JZ4760_LCD_TRULY_TFTG320240DTSW_18BIT
 	bool "TRULY_TFTG320240DTSW TFT panel (320x240) (Parallel 18bit mode)"
 
@@ -604,30 +573,20 @@ config JZ4760_LCD_TRULY_TFT_GG1P0319LTSW_W
 
 config JZ4760_SLCD_KGM701A3_TFT_SPFD5420A
 	bool "KGM701A3_TFT_SPFD5420A (400x240) (Smart LCD 18bit)"
-	select FB_JZ4760_SLCD
+	select FB_JZ4750_SLCD
 
-config JZ4760_LCD_HYNIX_HT12X14
-	bool "HYNIX_HT12X14 (1024x768) (LVDS)"
-	select FB_JZ_LVDS
+config JZ4760_LCD_RS97_V10
+	bool "AUO A030JTN01 For RetroGame Console V1.0"
 
-config JZ4760_LCD_KD101N2
-	bool "GUO XIAN KD101N2 (1024x600) (LVDS)"
-	select FB_JZ_LVDS
+config JZ4760_LCD_RS97_V21
+	bool "INNOLUX EJ030NA-01B For RetroGame Console V2.1"
 
-config JZ4760_LCD_KD101N4
-	bool "GUO XIAN KD101N4 (1280x800) (LVDS)"
-	select FB_JZ_LVDS
-
-config JZ_VGA_DISPLAY_DEFAULT
-	bool "Default VGA Display"
-	select JZ4760_VGA_DISPLAY
-	depends on (SOC_JZ4760 || SOC_JZ4760B || SOC_JZ4770)
-
-config JZ_VGA_DISPLAY_1024x768_60
-	bool "1024x768@60 VGA Display"
-	select JZ4760_VGA_DISPLAY
-	depends on (SOC_JZ4760 || SOC_JZ4760B || SOC_JZ4770)
-
+config JZ4760_LCD_RS97_V30
+	bool "LianKeWeiYe LKWY030A01 For RetroGame Console V3.0"
+	
+config JZ4760_VGA_DISPLAY
+	depends on SOC_JZ4760 || SOC_JZ4760B
+	bool "Jz4760 VGA Display"
 endchoice
 
 config JZ4810_AOSD
@@ -722,7 +681,7 @@ endchoice
 
 config FB_JZ4760_EPD
 	tristate "JZ4760 EPD Controller support"
-	depends on FB_JZSOC && (SOC_JZ4760 || SOC_JZ4760B || SOC_JZ4770)
+	depends on FB_JZSOC && (SOC_JZ4760 || SOC_JZ4760B)
 	---help---
 	   JZ4760 EPD Controller driver.
 	   JZ4760 EPD Controller support OSD function(refer jz4760_epdc_spec.pdf).JZ4760 EPD OSD implement 2 framebuffer layers: foreground0 and foreground1. JZ4760 EPD driver support only foreground0 default.
@@ -752,18 +711,18 @@ endchoice
 
 choice
 	depends on FB_JZ4760_EPD
-	prompt "JZ4760 EPD Panel Support"
-	default JZ4760_EINK_EPD_DISPLAY
+	prompt "JZ4760 EPD Panels Support"
+	default JZ4760_EPSON_EPD_DISPLAY
 	---help---
-	   Please select the EPD panel on your board
-config JZ4760_EINK_EPD_DISPLAY
-	bool "Eink EPD Display"
-
+	   Please select the lcd panel in you board
 config JZ4760_AUO_EPD_DISPLAY
-	bool "AUO EPD Display"
+	bool "Jz4760 AUO EPD Display"
+
+config JZ4760_EPSON_EPD_DISPLAY
+	bool "Jz4760 EPSON Eink EPD Display"
 
 config JZ4760_OED_EPD_DISPLAY
-	bool "OED EPD Display"
+	bool "Jz4760 OED EPD Display"
 
 endchoice
 

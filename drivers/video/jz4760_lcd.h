@@ -13,9 +13,8 @@
 #define __JZ4760_LCD_H__
 
 //#include <asm/io.h>
-//#define RS97_AUO
-#define RS97_INNOLUX
-//#define RS97_WEIRDSHIT
+
+
 #define NR_PALETTE	256
 #define PALETTE_SIZE	(NR_PALETTE*2)
 
@@ -97,11 +96,6 @@ struct jz4760lcd_info {
 #define FBIO_MODE_SWITCH	0x46a5 /* switch mode between LCD and TVE */
 #define FBIO_GET_TVE_MODE	0x46a6 /* get tve info */
 #define FBIO_SET_TVE_MODE	0x46a7 /* set tve mode */
-#define FBIOENBALECRTL          0x47a8
-#define FBIO_GET_IPU_RESTART_VALUE 0x46a8
-#define FBIOIPUWAIT	0x46a9 /* set back light level */
-#define FBIOIPURERUN	0x46aa /* set back light level */
-#define FBIO_WAITFORVSYNC	_IOW('F', 0x20, __u32)
 
 /*
  * LCD panel specific definition
@@ -461,12 +455,6 @@ do { \
 	#define SPDA		(32*1+21)       /*LCD_SDA*/
 	#define LCD_RET 	(32*5+6)       /*LCD_DISP_N use for lcd reset*/
 //#define LCD_STBY 	(32*4+25)       /*LCD_STBY, use for lcd standby*/
-#elif defined(CONFIG_JZ4760B_PALLAS)
-        #define SPEN		(32*3+13)
-        #define LCD_VCC         (32*4+25)
-        #define SPCK		(0)
-        #define SPDA		(0)
-        #define LCD_RET 	(32*4+6) 
 #else
 #error "driver/video/jz_toppoly_td043mgeb1.h, please define SPI pins on your board."
 #endif
@@ -559,16 +547,13 @@ do { \
 		__gpio_as_output(SPEN); /* use SPDA */	\
 		__gpio_as_output(SPCK); /* use SPCK */	\
 		__gpio_as_output(SPDA); /* use SPDA */	\
-                __gpio_as_output(LCD_VCC); /* use SPDA */	\
 		__gpio_set_pin(SPEN);			\
-	        udelay(100000);			\
-                __gpio_set_pin(LCD_VCC);			\
-                __gpio_as_output(LCD_RET);		\
+		__gpio_as_output(LCD_RET);		\
 		udelay(500);			\
 		__gpio_clear_pin(LCD_RET);	\
-		udelay(5000);			\
+		udelay(1000);			\
 		__gpio_set_pin(LCD_RET);	\
-		udelay(20000);			\
+		udelay(1000);			\
 	} while (0)
 
 #if 0
@@ -620,226 +605,6 @@ do { \
 #endif
 
 #endif	/* LCD_TOPPOLY_TD043MGEB1 */
-
-#if defined(CONFIG_JZ4760_LCD_UMIDO_L430)
-#define LCD_RET 	(32*4+2)       /*LCD_DISP_N use for lcd reset*/
-#define __lcd_special_pin_init() \
-  do { \
-    __gpio_as_output(LCD_RET);\
-    udelay(50);\
-    __gpio_clear_pin(LCD_RET);\
-    mdelay(50);\
-    __gpio_set_pin(LCD_RET);\
-  } while (0)
-#define __lcd_special_on() \
-  do { \
-    ; \
-  } while (0)
-#define __lcd_special_off() \
-  do { \
-    ;\
-  } while (0)
-#endif
-
-#if defined(CONFIG_JZ4760_LCD_TM370_LN430_9)
-#if defined(CONFIG_JZ4760_LEPUS) || defined(CONFIG_JZ4760B_LEPUS)/* board pavo */
-	#define SPEN		(32*4+0)       /*LCD_CS*/
-	#define SPCK		(32*3+11)       /*LCD_SCL*/
-	#define SPDA		(32*4+2)       /*LCD_SDA*/
-	#define LCD_RET 	(32*4+4)       
-#else
-#error "driver/video/Jzlcd.h, please define SPI pins on your board."
-#endif
-
-#define __spi_writ_bit16(reg, val) \
-do { \
-	unsigned char no;\
-	unsigned short value;\
-\
-	value=((reg<<8)|(val&0xFF));	\
-\
-	__gpio_set_pin(SPEN);\
-	__gpio_clear_pin(SPCK);\
-	__gpio_clear_pin(SPDA);\
-	__gpio_clear_pin(SPEN);\
-	udelay(50);\
-	for(no=0;no<16;no++)\
-	{\
-		__gpio_clear_pin(SPCK);\
-		if((value&0x8000)==0x8000)\
-			__gpio_set_pin(SPDA);\
-		else\
-			__gpio_clear_pin(SPDA);\
-		udelay(50);\
-		__gpio_set_pin(SPCK);\
-		value <<= 1; \
-		udelay(50);\
-	 }\
-	__gpio_set_pin(SPEN);\
-	udelay(50);\
-} while (0)
-
-
-#define __spi_send_value(reg, val) \
-do { \
-	unsigned char no;\
-	unsigned short value;\
-	unsigned char cmd_dat=0;\
-	cmd_dat =reg;\
-	value = val;\
-	__gpio_set_pin(SPEN);\
-	__gpio_clear_pin(SPCK);\
-	__gpio_clear_pin(SPDA);\
-	__gpio_clear_pin(SPEN);\
-	udelay(50);\
-	if(cmd_dat)\
-		value |= 1<<8;     \
-	else \
-		value &= ~(1<<8);  \
-	for(no=0;no<9;no++)\
-	{\
-		__gpio_clear_pin(SPCK);\
-		if((value&0x100)==0x100)\
-			__gpio_set_pin(SPDA);\
-		else\
-			__gpio_clear_pin(SPDA);\
-		udelay(50);\
-		__gpio_set_pin(SPCK);\
-		value <<= 1; \
-		udelay(50);\
-	 }\
-	__gpio_set_pin(SPEN);\
-	udelay(50);\
-} while (0)
-
-#define spi_send_cmd(cmd)     __spi_send_value(0,cmd)
-#define spi_send_data(data)   __spi_send_value(1,data)
-
-#define __lcd_special_pin_init() \
- do { \
-	__gpio_as_output(SPEN); /* use SPDA */	\
-	__gpio_as_output(SPCK); /* use SPCK */	\
-	__gpio_as_output(SPDA); /* use SPDA */	\
-	__gpio_as_output(LCD_RET);              \
-	udelay(50);	                            \
-	__gpio_clear_pin(LCD_RET);              \
-	mdelay(100);				    \
-	__gpio_set_pin(LCD_RET);		\
- }while (0)
-
-#if defined(RS97_AUO)
-#define __lcd_special_on()   \
- do { \
- 	printk("\n auo-3.0lcd ... \n");\
-	 __spi_writ_bit16(0x05,0x34);     \
-	 mdelay(5);\
-	 __spi_writ_bit16(0x05,0x74); \
-	 __spi_writ_bit16(0x05,0x75); \
-	 mdelay(10);\
- } while (0) 
-#elif defined(RS97_WEIRDSHIT) //ILI8965
-
-#define __lcd_special_on()   \
- do { \
- 	printk("\n auo-ILI8965B ... \n");\
-__spi_writ_bit16(0x70, 0x06);  \
-__spi_writ_bit16(0x05, 0x81);   \
-mdelay(48); \
-__spi_writ_bit16(0x70, 0x07);   \
-__spi_writ_bit16(0x06, 0x08);    \
-__spi_writ_bit16(0x01, 0x59);   \
-__spi_writ_bit16(0x03, 0x10);  \
-__spi_writ_bit16(0x04, 0x10);   \
-__spi_writ_bit16(0x08, 0x20);   \
-__spi_writ_bit16(0x0A, 0x84);   \
-__spi_writ_bit16(0x5A, 0x05);  \
-__spi_writ_bit16(0x54, 0XD0);  \
-__spi_writ_bit16(0x19, 0x05); \
-__spi_writ_bit16(0x1A, 0x24);  \
-__spi_writ_bit16(0x1B, 0x2A);  \
-__spi_writ_bit16(0x1C, 0x0E);  \
-__spi_writ_bit16(0x1D, 0x10);  \
-__spi_writ_bit16(0x1E, 0x17);  \
-__spi_writ_bit16(0x1F, 0XD5);  \
-__spi_writ_bit16(0x20, 0XB0);  \
-__spi_writ_bit16(0x21, 0x4F);  \
-__spi_writ_bit16(0x22, 0x6F); \
-__spi_writ_bit16(0x23, 0x06);  \
-__spi_writ_bit16(0x24, 0x0E);  \
-__spi_writ_bit16(0x25, 0x0F);  \
-__spi_writ_bit16(0x26, 0x28);  \
-__spi_writ_bit16(0x27, 0x22);  \
-__spi_writ_bit16(0x28, 0x08);  \
-__spi_writ_bit16(0x29, 0x04);  \
-__spi_writ_bit16(0x2A, 0x1F);  \
-__spi_writ_bit16(0x2B, 0x22);  \
-__spi_writ_bit16(0x2C, 0x0F); \
-__spi_writ_bit16(0x2D, 0x11);  \
-__spi_writ_bit16(0x2E, 0x06); \
-__spi_writ_bit16(0x2F, 0x14);  \
-__spi_writ_bit16(0x30, 0x10); \
-__spi_writ_bit16(0x31, 0x0D);  \
-__spi_writ_bit16(0x32, 0x28); \
-__spi_writ_bit16(0x33, 0x23);  \
-__spi_writ_bit16(0x34, 0x06); \
- } while (0) 
- 
-#elif defined(RS97_INNOLUX) 
-#define __lcd_special_on()   \
-do { \
-	printk("\n EJ027NA-3.0lcd ... \n");\
-	__spi_writ_bit16(0x05, 0x1E); \
-	__spi_writ_bit16(0x05, 0x5C); \
-	__spi_writ_bit16(0x02, 0x14); \
-	__spi_writ_bit16(0x03, 0x40); \
-	__spi_writ_bit16(0x04, 0x0b); /*0x2b*/\
-	__spi_writ_bit16(0x06, 0x1B); \
-	__spi_writ_bit16(0x07, 0x28); \
-	__spi_writ_bit16(0x0C, 0x06); \
-	__spi_writ_bit16(0x0D, 0x40); \
-	__spi_writ_bit16(0x0E, 0x40); \
-	__spi_writ_bit16(0x0F, 0x40); \
-	__spi_writ_bit16(0x10, 0x40); \
-	__spi_writ_bit16(0x11, 0x40); \
-	__spi_writ_bit16(0x2F, 0x40); \
-	__spi_writ_bit16(0x5A, 0x02); \
-\
-	__spi_writ_bit16(0x30, 0x07); \
-	__spi_writ_bit16(0x31, 0x57); \
-	__spi_writ_bit16(0x32, 0x53); \
-	__spi_writ_bit16(0x33, 0x77); \
-	__spi_writ_bit16(0x34, 0XB8); \
-	__spi_writ_bit16(0x35, 0xBD); \
-	__spi_writ_bit16(0x36, 0XB8); \
-	__spi_writ_bit16(0x37, 0XE7); \
-	__spi_writ_bit16(0x38, 0x04); \
-	__spi_writ_bit16(0x39, 0xFF); \
-\
-	__spi_writ_bit16(0x40, 0x0B); \
-	__spi_writ_bit16(0x41, 0xB8); \
-	__spi_writ_bit16(0x42, 0xAB); \
-	__spi_writ_bit16(0x43, 0XB9); \
-	__spi_writ_bit16(0x44, 0x6A); \
-	__spi_writ_bit16(0x45, 0x56); \
-	__spi_writ_bit16(0x46, 0x61); \
-	__spi_writ_bit16(0x47, 0x08); \
-	__spi_writ_bit16(0x48, 0x0F); \
-	__spi_writ_bit16(0x49, 0x0F); \
-\
-	__spi_writ_bit16(0x2B, 0x01); \
-} while (0)
- 
-#endif
-
- 
-#define __lcd_special_off() \
-  do { 									\
-    __gpio_as_output(GPIO_LCD_PWM);		\
-	__gpio_clear_pin(GPIO_LCD_PWM);		\
-  } while (0)
-#endif
-
-
 
 #if defined(CONFIG_JZ4760_LCD_TRULY_TFT_GG1P0319LTSW_W)
 static inline void CmdWrite(unsigned int cmd)
@@ -1067,6 +832,389 @@ static void SlcdInit(void)
 
 #endif	/* #if CONFIG_JZ4760_LCD_TRULY_TFT_GG1P0319LTSW_W */
 
+#if defined(CONFIG_JZ4760_LCD_RS97_V10)
+#if defined(CONFIG_JZ4760_LEPUS) || defined(CONFIG_JZ4760B_LEPUS)/* board pavo */
+	#define SPEN		(32*4+0)       /*LCD_CS*/
+	#define SPCK		(32*3+11)       /*LCD_SCL*/
+	#define SPDA		(32*4+2)       /*LCD_SDA*/
+	#define LCD_RET 	(32*4+4)       
+#else
+#error "driver/video/Jzlcd.h, please define SPI pins on your board."
+#endif
+
+#define __spi_writ_bit16(reg, val) \
+do { \
+	unsigned char no;\
+	unsigned short value;\
+\
+	value=((reg<<8)|(val&0xFF));	\
+\
+	__gpio_set_pin(SPEN);\
+	__gpio_clear_pin(SPCK);\
+	__gpio_clear_pin(SPDA);\
+	__gpio_clear_pin(SPEN);\
+	udelay(50);\
+	for(no=0;no<16;no++)\
+	{\
+		__gpio_clear_pin(SPCK);\
+		if((value&0x8000)==0x8000)\
+			__gpio_set_pin(SPDA);\
+		else\
+			__gpio_clear_pin(SPDA);\
+		udelay(50);\
+		__gpio_set_pin(SPCK);\
+		value <<= 1; \
+		udelay(50);\
+	 }\
+	__gpio_set_pin(SPEN);\
+	udelay(50);\
+} while (0)
+
+
+#define __spi_send_value(reg, val) \
+do { \
+	unsigned char no;\
+	unsigned short value;\
+	unsigned char cmd_dat=0;\
+	cmd_dat =reg;\
+	value = val;\
+	__gpio_set_pin(SPEN);\
+	__gpio_clear_pin(SPCK);\
+	__gpio_clear_pin(SPDA);\
+	__gpio_clear_pin(SPEN);\
+	udelay(50);\
+	if(cmd_dat)\
+		value |= 1<<8;     \
+	else \
+		value &= ~(1<<8);  \
+	for(no=0;no<9;no++)\
+	{\
+		__gpio_clear_pin(SPCK);\
+		if((value&0x100)==0x100)\
+			__gpio_set_pin(SPDA);\
+		else\
+			__gpio_clear_pin(SPDA);\
+		udelay(50);\
+		__gpio_set_pin(SPCK);\
+		value <<= 1; \
+		udelay(50);\
+	 }\
+	__gpio_set_pin(SPEN);\
+	udelay(50);\
+} while (0)
+
+#define spi_send_cmd(cmd)     __spi_send_value(0,cmd)
+#define spi_send_data(data)   __spi_send_value(1,data)
+
+#define __lcd_special_pin_init() \
+ do { \
+	__gpio_as_output(SPEN); /* use SPDA */	\
+	__gpio_as_output(SPCK); /* use SPCK */	\
+	__gpio_as_output(SPDA); /* use SPDA */	\
+	__gpio_as_output(LCD_RET);              \
+	udelay(50);	                            \
+	__gpio_clear_pin(LCD_RET);              \
+	mdelay(100);				    \
+	__gpio_set_pin(LCD_RET);		\
+ }while (0)
+ 
+#define __lcd_special_on()   \
+ do { \
+ 	printk("\n RS97 V10 LCD ... \n");\
+	 __spi_writ_bit16(0x05,0x34);     \
+	 mdelay(5);\
+	 __spi_writ_bit16(0x05,0x74); \
+	 __spi_writ_bit16(0x05,0x75); \
+	 mdelay(10);\
+ } while (0) 
+
+#define __lcd_special_off() \
+  do { 									\
+    __gpio_as_output(GPIO_LCD_PWM);		\
+	__gpio_clear_pin(GPIO_LCD_PWM);		\
+  } while (0)
+
+#endif /* CONFIG_JZ4760_LCD_RS97_V10 */
+
+#if defined(CONFIG_JZ4760_LCD_RS97_V21)
+#if defined(CONFIG_JZ4760_LEPUS) || defined(CONFIG_JZ4760B_LEPUS)/* board pavo */
+	#define SPEN		(32*4+0)       /*LCD_CS*/
+	#define SPCK		(32*3+11)       /*LCD_SCL*/
+	#define SPDA		(32*4+2)       /*LCD_SDA*/
+	#define LCD_RET 	(32*4+4)       
+#else
+#error "driver/video/Jzlcd.h, please define SPI pins on your board."
+#endif
+
+#define __spi_writ_bit16(reg, val) \
+do { \
+	unsigned char no;\
+	unsigned short value;\
+\
+	value=((reg<<8)|(val&0xFF));	\
+\
+	__gpio_set_pin(SPEN);\
+	__gpio_clear_pin(SPCK);\
+	__gpio_clear_pin(SPDA);\
+	__gpio_clear_pin(SPEN);\
+	udelay(50);\
+	for(no=0;no<16;no++)\
+	{\
+		__gpio_clear_pin(SPCK);\
+		if((value&0x8000)==0x8000)\
+			__gpio_set_pin(SPDA);\
+		else\
+			__gpio_clear_pin(SPDA);\
+		udelay(50);\
+		__gpio_set_pin(SPCK);\
+		value <<= 1; \
+		udelay(50);\
+	 }\
+	__gpio_set_pin(SPEN);\
+	udelay(50);\
+} while (0)
+
+
+#define __spi_send_value(reg, val) \
+do { \
+	unsigned char no;\
+	unsigned short value;\
+	unsigned char cmd_dat=0;\
+	cmd_dat =reg;\
+	value = val;\
+	__gpio_set_pin(SPEN);\
+	__gpio_clear_pin(SPCK);\
+	__gpio_clear_pin(SPDA);\
+	__gpio_clear_pin(SPEN);\
+	udelay(50);\
+	if(cmd_dat)\
+		value |= 1<<8;     \
+	else \
+		value &= ~(1<<8);  \
+	for(no=0;no<9;no++)\
+	{\
+		__gpio_clear_pin(SPCK);\
+		if((value&0x100)==0x100)\
+			__gpio_set_pin(SPDA);\
+		else\
+			__gpio_clear_pin(SPDA);\
+		udelay(50);\
+		__gpio_set_pin(SPCK);\
+		value <<= 1; \
+		udelay(50);\
+	 }\
+	__gpio_set_pin(SPEN);\
+	udelay(50);\
+} while (0)
+
+#define spi_send_cmd(cmd)     __spi_send_value(0,cmd)
+#define spi_send_data(data)   __spi_send_value(1,data)
+
+#define __lcd_special_pin_init() \
+ do { \
+	__gpio_as_output(SPEN); /* use SPDA */	\
+	__gpio_as_output(SPCK); /* use SPCK */	\
+	__gpio_as_output(SPDA); /* use SPDA */	\
+	__gpio_as_output(LCD_RET);              \
+	udelay(50);	                            \
+	__gpio_clear_pin(LCD_RET);              \
+	mdelay(100);				    \
+	__gpio_set_pin(LCD_RET);		\
+ }while (0)
+
+#define __lcd_special_on()   \
+do { \
+	printk("\n EJ027NA-3.0lcd ... \n");\
+	__spi_writ_bit16(0x05, 0x1E); \
+	__spi_writ_bit16(0x05, 0x5C); \
+	__spi_writ_bit16(0x02, 0x14); \
+	__spi_writ_bit16(0x03, 0x40); \
+	__spi_writ_bit16(0x04, 0x0b); /*0x2b*/\
+	__spi_writ_bit16(0x06, 0x1B); \
+	__spi_writ_bit16(0x07, 0x28); \
+	__spi_writ_bit16(0x0C, 0x06); \
+	__spi_writ_bit16(0x0D, 0x40); \
+	__spi_writ_bit16(0x0E, 0x40); \
+	__spi_writ_bit16(0x0F, 0x40); \
+	__spi_writ_bit16(0x10, 0x40); \
+	__spi_writ_bit16(0x11, 0x40); \
+	__spi_writ_bit16(0x2F, 0x40); \
+	__spi_writ_bit16(0x5A, 0x02); \
+\
+	__spi_writ_bit16(0x30, 0x07); \
+	__spi_writ_bit16(0x31, 0x57); \
+	__spi_writ_bit16(0x32, 0x53); \
+	__spi_writ_bit16(0x33, 0x77); \
+	__spi_writ_bit16(0x34, 0XB8); \
+	__spi_writ_bit16(0x35, 0xBD); \
+	__spi_writ_bit16(0x36, 0XB8); \
+	__spi_writ_bit16(0x37, 0XE7); \
+	__spi_writ_bit16(0x38, 0x04); \
+	__spi_writ_bit16(0x39, 0xFF); \
+\
+	__spi_writ_bit16(0x40, 0x0B); \
+	__spi_writ_bit16(0x41, 0xB8); \
+	__spi_writ_bit16(0x42, 0xAB); \
+	__spi_writ_bit16(0x43, 0XB9); \
+	__spi_writ_bit16(0x44, 0x6A); \
+	__spi_writ_bit16(0x45, 0x56); \
+	__spi_writ_bit16(0x46, 0x61); \
+	__spi_writ_bit16(0x47, 0x08); \
+	__spi_writ_bit16(0x48, 0x0F); \
+	__spi_writ_bit16(0x49, 0x0F); \
+\
+	__spi_writ_bit16(0x2B, 0x01); \
+} while (0)
+
+ #define __lcd_special_off() \
+  do { 									\
+    __gpio_as_output(GPIO_LCD_PWM);		\
+	__gpio_clear_pin(GPIO_LCD_PWM);		\
+  } while (0)
+#endif /* CONFIG_JZ4760_LCD_RS97_V21 */
+
+#if defined(CONFIG_JZ4760_LCD_RS97_V30)
+#if defined(CONFIG_JZ4760_LEPUS) || defined(CONFIG_JZ4760B_LEPUS)/* board pavo */
+	#define SPEN		(32*4+0)       /*LCD_CS*/
+	#define SPCK		(32*3+11)       /*LCD_SCL*/
+	#define SPDA		(32*4+2)       /*LCD_SDA*/
+	#define LCD_RET 	(32*4+4)       
+#else
+#error "driver/video/Jzlcd.h, please define SPI pins on your board."
+#endif
+
+#define __spi_writ_bit16(reg, val) \
+do { \
+	unsigned char no;\
+	unsigned short value;\
+\
+	value=((reg<<8)|(val&0xFF));	\
+\
+	__gpio_set_pin(SPEN);\
+	__gpio_clear_pin(SPCK);\
+	__gpio_clear_pin(SPDA);\
+	__gpio_clear_pin(SPEN);\
+	udelay(50);\
+	for(no=0;no<16;no++)\
+	{\
+		__gpio_clear_pin(SPCK);\
+		if((value&0x8000)==0x8000)\
+			__gpio_set_pin(SPDA);\
+		else\
+			__gpio_clear_pin(SPDA);\
+		udelay(50);\
+		__gpio_set_pin(SPCK);\
+		value <<= 1; \
+		udelay(50);\
+	 }\
+	__gpio_set_pin(SPEN);\
+	udelay(50);\
+} while (0)
+
+
+#define __spi_send_value(reg, val) \
+do { \
+	unsigned char no;\
+	unsigned short value;\
+	unsigned char cmd_dat=0;\
+	cmd_dat =reg;\
+	value = val;\
+	__gpio_set_pin(SPEN);\
+	__gpio_clear_pin(SPCK);\
+	__gpio_clear_pin(SPDA);\
+	__gpio_clear_pin(SPEN);\
+	udelay(50);\
+	if(cmd_dat)\
+		value |= 1<<8;     \
+	else \
+		value &= ~(1<<8);  \
+	for(no=0;no<9;no++)\
+	{\
+		__gpio_clear_pin(SPCK);\
+		if((value&0x100)==0x100)\
+			__gpio_set_pin(SPDA);\
+		else\
+			__gpio_clear_pin(SPDA);\
+		udelay(50);\
+		__gpio_set_pin(SPCK);\
+		value <<= 1; \
+		udelay(50);\
+	 }\
+	__gpio_set_pin(SPEN);\
+	udelay(50);\
+} while (0)
+
+#define spi_send_cmd(cmd)     __spi_send_value(0,cmd)
+#define spi_send_data(data)   __spi_send_value(1,data)
+
+#define __lcd_special_pin_init() \
+ do { \
+	__gpio_as_output(SPEN); /* use SPDA */	\
+	__gpio_as_output(SPCK); /* use SPCK */	\
+	__gpio_as_output(SPDA); /* use SPDA */	\
+	__gpio_as_output(LCD_RET);              \
+	udelay(50);	                            \
+	__gpio_clear_pin(LCD_RET);              \
+	mdelay(100);				    \
+	__gpio_set_pin(LCD_RET);		\
+ }while (0)
+
+#define __lcd_special_on()   \
+ do { \
+ 	printk("\n auo-ILI8965B ... \n");\
+__spi_writ_bit16(0x70, 0x06);  \
+__spi_writ_bit16(0x05, 0x81);   \
+mdelay(48); \
+__spi_writ_bit16(0x70, 0x07);   \
+__spi_writ_bit16(0x06, 0x08);    \
+__spi_writ_bit16(0x01, 0x59);   \
+__spi_writ_bit16(0x03, 0x10);  \
+__spi_writ_bit16(0x04, 0x10);   \
+__spi_writ_bit16(0x08, 0x20);   \
+__spi_writ_bit16(0x0A, 0x84);   \
+__spi_writ_bit16(0x5A, 0x05);  \
+__spi_writ_bit16(0x54, 0XD0);  \
+__spi_writ_bit16(0x19, 0x05); \
+__spi_writ_bit16(0x1A, 0x24);  \
+__spi_writ_bit16(0x1B, 0x2A);  \
+__spi_writ_bit16(0x1C, 0x0E);  \
+__spi_writ_bit16(0x1D, 0x10);  \
+__spi_writ_bit16(0x1E, 0x17);  \
+__spi_writ_bit16(0x1F, 0XD5);  \
+__spi_writ_bit16(0x20, 0XB0);  \
+__spi_writ_bit16(0x21, 0x4F);  \
+__spi_writ_bit16(0x22, 0x6F); \
+__spi_writ_bit16(0x23, 0x06);  \
+__spi_writ_bit16(0x24, 0x0E);  \
+__spi_writ_bit16(0x25, 0x0F);  \
+__spi_writ_bit16(0x26, 0x28);  \
+__spi_writ_bit16(0x27, 0x22);  \
+__spi_writ_bit16(0x28, 0x08);  \
+__spi_writ_bit16(0x29, 0x04);  \
+__spi_writ_bit16(0x2A, 0x1F);  \
+__spi_writ_bit16(0x2B, 0x22);  \
+__spi_writ_bit16(0x2C, 0x0F); \
+__spi_writ_bit16(0x2D, 0x11);  \
+__spi_writ_bit16(0x2E, 0x06); \
+__spi_writ_bit16(0x2F, 0x14);  \
+__spi_writ_bit16(0x30, 0x10); \
+__spi_writ_bit16(0x31, 0x0D);  \
+__spi_writ_bit16(0x32, 0x28); \
+__spi_writ_bit16(0x33, 0x23);  \
+__spi_writ_bit16(0x34, 0x06); \
+ } while (0) 
+
+
+ #define __lcd_special_off() \
+  do { 									\
+    __gpio_as_output(GPIO_LCD_PWM);		\
+	__gpio_clear_pin(GPIO_LCD_PWM);		\
+  } while (0)
+
+
+#endif /* CONFIG_JZ4760_LCD_RS97_V30 */
+
+
 #ifndef __lcd_special_pin_init
 #define __lcd_special_pin_init()
 #endif
@@ -1085,42 +1233,35 @@ static void SlcdInit(void)
 #define __lcd_display_pin_init()
 #define __lcd_display_on()
 #define __lcd_display_off()
-
-/* board lepus */   //my board ok
-#elif defined(CONFIG_JZ4760_LEPUS) || defined(CONFIG_JZ4760B_LEPUS)
- #define __lcd_display_pin_init() \
-	do { \
-		__gpio_as_output(GPIO_LCD_VCC_EN_N);	 \
-		__gpio_as_output(GPIO_LCD_PWM);\
-		__lcd_special_pin_init();    \
-	} while (0)
-
- #define __lcd_display_on() \
-	do { \
-		__gpio_set_pin(GPIO_LCD_VCC_EN_N);	\
-		__lcd_special_on();			\
-	} while (0)
-
- #define __lcd_display_off() \
-	do { \
-		__lcd_special_off(); \
-		 __gpio_clear_pin(GPIO_LCD_VCC_EN_N);	\
-	} while (0)
-
-#else /* other boards */
+#elif defined(CONFIG_JZ4760_LEPUS) || defined(CONFIG_JZ4760B_LEPUS)/* board lepus */
 #define __lcd_display_pin_init() \
 do { \
-        __gpio_as_output(GPIO_LCD_VCC_EN_N); 	 \
-        __gpio_as_output(GPIO_LCD_PWM);	    \
+	__gpio_as_output(GPIO_LCD_VCC_EN_N);	 \
+	__lcd_special_pin_init();	   \
+} while (0)
+
+#define __lcd_display_on() \
+do { \
+	__gpio_set_pin(GPIO_LCD_VCC_EN_N);	\
+	__lcd_special_on();			\
+} while (0)
+
+#define __lcd_display_off() \
+do { \
+	__lcd_special_off(); \
+	 __gpio_clear_pin(GPIO_LCD_VCC_EN_N);	\
+} while (0)
+
+#else /* other boards */
+
+#define __lcd_display_pin_init() \
+do { \
 	__lcd_special_pin_init();	   \
 } while (0)
 #define __lcd_display_on() \
 do { \
-	    __lcd_special_on();			\
-	    __lcd_set_backlight_level(80);\
-        mdelay(300); \
-        __gpio_set_pin(GPIO_LCD_VCC_EN_N);	\
-        printk("GPIO_LCD_VCC_EN_N is %d\n",GPIO_LCD_VCC_EN_N);\
+	__lcd_special_on();			\
+	__lcd_set_backlight_level(80);		\
 } while (0)
 
 #define __lcd_display_off() \
