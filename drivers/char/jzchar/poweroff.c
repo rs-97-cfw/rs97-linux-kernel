@@ -66,8 +66,8 @@ MODULE_LICENSE("GPL");
 #endif
 
 
-#define POWEROFF_PERIOD         10000    /* unit: ms */
-#define POWEROFF_DELAY          1000     /* unit: ms */
+#define POWEROFF_PERIOD         1000    /* unit: ms */
+#define POWEROFF_DELAY          500     /* unit: ms */
 //KJH ADD 
 static struct task_struct *poweroff_task;
 static struct timer_list poweroff_timer;

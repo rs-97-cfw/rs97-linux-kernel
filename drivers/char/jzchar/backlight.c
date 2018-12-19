@@ -43,7 +43,7 @@ typedef enum
 }buttonStatus;
 
 int backlightButton = BTN_NONE;
-int backlightLevel = 65;
+extern unsigned backlight_value;
 long disable = 0;
 
 static void process_button(int* button,uint gpio_pin, bool onStatus)
@@ -90,10 +90,10 @@ static int backlight_control_thread(void *unused)
 			process_button(&backlightButton,UMIDO_KEY_LED, 0);
 			if (backlightButton == BTN_PRESSED)
 			{
-				backlightLevel += 20;
-				if (backlightLevel > 100)
-					backlightLevel = 5;
-				__lcd_set_backlight_level(backlightLevel);
+				backlight_value += 20;
+				if (backlight_value > 100)
+					backlight_value = 5;
+				__lcd_set_backlight_level(backlight_value);
 			}
 		}
 		msleep(50);
