@@ -405,7 +405,7 @@ struct jz4760lcd_info jz4760_lcd_panel = {
 		.ctrl = LCD_CTRL_OFUM | LCD_CTRL_BST_16, /* 16words burst, enable out FIFO underrun irq */
 		320,
 		480,
-		120,
+		60,
 		20,
 		1,
 		32,
@@ -1358,6 +1358,7 @@ static int jz4760fb_pan_display(struct fb_var_screeninfo *var, struct fb_info *i
 		break;
 	case 1:
 		dma0_desc0->databuf = (unsigned int)virt_to_phys((void *)(*lcd_current));
+		ipu_driver_flush_tv();
 		break;
 	case 2:
 	case 3:
@@ -2926,37 +2927,6 @@ static void slcd_init(void)
 	return;
 }
 
-static int fb_ipu_resize_thread(void *unused)
-{
-	printk("kernel frame buffer resize thread start!\n");
-	while (!ipu_task_out)
-	{
-		//printk("zzzz\n");
-		set_current_state(TASK_INTERRUPTIBLE);
-		schedule_timeout(HZ / 60);
-		ipu_driver_flush_tv();
-	}
-	printk("kernel frame buffer resize thread end start!\n");
-	ipu_driver_close_tv();
-	ipu_task = 0;
-	printk("kernel frame buffer resize thread end!\n");
-	return 0;
-}
-
-void fb_ipu_resize_start(void)
-{
-	if (ipu_task)
-		return;
-	ipu_driver_open_tv(320, 240, 320, 480);
-	ipu_task_out = 0;
-	ipu_task = kthread_run(fb_ipu_resize_thread, NULL, "fb_resize");
-	if (IS_ERR(ipu_task))
-	{
-		printk("Kernel fb resize thread start error!\n");
-		return;
-	}
-}
-
 static int fb_double_line_thread(void *unused)
 {
 	const int WIDTH = 320;
@@ -3078,6 +3048,7 @@ static int proc_ipu_mode_write_proc(
 	if (tmp_output_flag != Lcd_output_mode)
 	{
 		Lcd_output_mode = tmp_output_flag;
+		ipu_driver_close_tv();
 	}
 	else
 	{
@@ -3096,7 +3067,7 @@ static int proc_ipu_mode_write_proc(
 		memset(lcd_frame0, 0x00, LCD_SCREEN_W * LCD_SCREEN_H * 4);
 		memset(ipu_buffer, 0x00, LCD_SCREEN_W * LCD_SCREEN_H * 2);
 		lcd_current = &ipu_buffer;
-		fb_ipu_resize_start();
+		ipu_driver_open_tv(320, 240, 320, 480);
 		break;
 
 	case 2:
