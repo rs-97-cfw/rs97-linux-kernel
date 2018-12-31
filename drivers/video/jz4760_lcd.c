@@ -828,6 +828,9 @@ static unsigned char *lcd_palette;
 unsigned char *lcd_frame0, *lcd_frame1;
 
 //TONY IPU
+#define MAX_XRES 640
+#define MAX_YRES 480
+
 unsigned int backlight_value = 80;
 
 unsigned char *ipu_buffer;
@@ -1640,53 +1643,17 @@ static int bpp_to_data_bpp(int bpp)
  */
 static int jz4760fb_map_smem(struct lcd_cfb_info *cfb)
 {
-	unsigned long page;
-	unsigned int page_shift, needroom, needroom1, bpp, w, h;
+	/* Compute space for max res at 32bpp, double buffered + ipu buffer. */
+	unsigned int size = PAGE_ALIGN(MAX_XRES * MAX_YRES * 4 * 3);
+	void *page_virt;
 
-	bpp = bpp_to_data_bpp(jz4760_lcd_info->osd.fg0.bpp);
-
-	D("FG0 BPP: %d, Data BPP: %d.", jz4760_lcd_info->osd.fg0.bpp, bpp);
-
-#ifndef CONFIG_FB_JZ4760_TVE
-	w = jz4760_lcd_info->osd.fg0.w;
-	h = jz4760_lcd_info->osd.fg0.h;
-#else
-	w = (jz4760_lcd_info->osd.fg0.w > TVE_WIDTH_PAL) ? jz4760_lcd_info->osd.fg0.w : TVE_WIDTH_PAL;
-	h = (jz4760_lcd_info->osd.fg0.h > TVE_HEIGHT_PAL) ? jz4760_lcd_info->osd.fg0.h : TVE_HEIGHT_PAL;
-#endif
-	needroom1 = needroom = ((w * bpp + 7) >> 3) * h * 2;
-
-#if defined(CONFIG_FB_JZ4760_LCD_USE_2LAYER_FRAMEBUFFER)
-	bpp = bpp_to_data_bpp(jz4760_lcd_info->osd.fg1.bpp);
-
-	D("FG1 BPP: %d, Data BPP: %d.", jz4760_lcd_info->osd.fg1.bpp, bpp);
-
-#ifndef CONFIG_FB_JZ4760_TVE
-	w = jz4760_lcd_info->osd.fg1.w;
-	h = jz4760_lcd_info->osd.fg1.h;
-#else
-	w = (jz4760_lcd_info->osd.fg1.w > TVE_WIDTH_PAL) ? jz4760_lcd_info->osd.fg1.w : TVE_WIDTH_PAL;
-	h = (jz4760_lcd_info->osd.fg1.h > TVE_HEIGHT_PAL) ? jz4760_lcd_info->osd.fg1.h : TVE_HEIGHT_PAL;
-#endif
-	needroom += ((w * bpp + 7) >> 3) * h * 2;
-#endif // two layer
-
-	for (page_shift = 0; page_shift < 13; page_shift++)
-		if ((PAGE_SIZE << page_shift) >= needroom)
-			break;
-#if defined(CONFIG_JZ4760_HDMI_DISPLAY)
-	page_shift = 11;
-#endif
 	lcd_palette = (unsigned char *)__get_free_pages(GFP_KERNEL, 0);
-	lcd_frame0 = (unsigned char *)__get_free_pages(GFP_KERNEL, page_shift);
-	//TONY IPU
-	ipu_buffer = (unsigned char *)__get_free_pages(GFP_KERNEL, page_shift);
+	lcd_frame0 = alloc_pages_exact(size, GFP_KERNEL);
+	ipu_buffer = lcd_frame0 + (MAX_XRES * MAX_YRES * 4 * 2);
 	//TONY IPU
 
-	if ((!lcd_palette) || (!lcd_frame0) || (!ipu_buffer))
+	if ((!lcd_palette) || (!lcd_frame0))
 		return -ENOMEM;
-	memset((void *)lcd_palette, 0, PAGE_SIZE);
-	memset((void *)lcd_frame0, 0, PAGE_SIZE << page_shift);
 
 	dma_desc_base = (struct jz4760_lcd_dma_desc *)((void *)lcd_palette + ((PALETTE_SIZE + 3) / 4) * 4);
 
@@ -1706,34 +1673,21 @@ static int jz4760fb_map_smem(struct lcd_cfb_info *cfb)
 	}
 #endif
 
-#if defined(CONFIG_FB_JZ4760_LCD_USE_2LAYER_FRAMEBUFFER)
-	lcd_frame1 = lcd_frame0 + needroom1;
-#endif
-
 	/*
 	 * Set page reserved so that mmap will work. This is necessary
 	 * since we'll be remapping normal memory.
 	 */
-	page = (unsigned long)lcd_palette;
-	SetPageReserved(virt_to_page((void *)page));
+	page_virt = (unsigned long)lcd_palette;
+	SetPageReserved(virt_to_page((void *)page_virt));
 
-	for (page = (unsigned long)lcd_frame0;
-		 page < PAGE_ALIGN((unsigned long)lcd_frame0 + (PAGE_SIZE << page_shift));
-		 page += PAGE_SIZE)
-	{
-		SetPageReserved(virt_to_page((void *)page));
+	for (page_virt = lcd_frame0;
+	     page_virt < lcd_frame0 + size; page_virt += PAGE_SIZE) {
+		SetPageReserved(virt_to_page(page_virt));
+		clear_page(page_virt);
 	}
-	//TONY IPU
-	for (page = (unsigned long)ipu_buffer;
-		 page < PAGE_ALIGN((unsigned long)ipu_buffer + (PAGE_SIZE << page_shift));
-		 page += PAGE_SIZE)
-	{
-		SetPageReserved(virt_to_page((void *)page));
-	}
-	//TONY IPU
 
 	cfb->fb.fix.smem_start = virt_to_phys((void *)lcd_frame0);
-	cfb->fb.fix.smem_len = (PAGE_SIZE << page_shift); /* page_shift/2 ??? */
+	cfb->fb.fix.smem_len = (size); /* page_shift/2 ??? */
 	cfb->fb.screen_base =
 		(unsigned char *)(((unsigned int)lcd_frame0 & 0x1fffffff) | 0xa0000000);
 
