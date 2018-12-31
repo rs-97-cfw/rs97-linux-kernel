@@ -57,7 +57,7 @@
 MODULE_DESCRIPTION("Jz4760 LCD Controller driver");
 MODULE_AUTHOR("Wolfgang Wang, <lgwang@ingenic.cn>");
 MODULE_LICENSE("GPL");
-
+//#define RGB_TEST
 #define D(fmt, args...) \
 	//	printk(KERN_ERR "%s(): "fmt"\n", __func__, ##args)
 
@@ -356,43 +356,35 @@ struct jz4760lcd_info jz4760_lcd_panel = {
 		.fg1 = {32, 0, 0, 640, 480}, /* bpp, x, y, w, h */
 	},
 #elif defined(CONFIG_JZ4760_LCD_RS97_V10)
-	.panel = {
-		.cfg = LCD_CFG_LCDPIN_LCD | LCD_CFG_RECOVER | /* Underrun recover */
-			   LCD_CFG_MODE_SERIAL_TFT |			  /* General TFT panel */
+    .panel = {
+		.cfg = LCD_CFG_LCDPIN_LCD | LCD_CFG_RECOVER | /* Underrun recover */ 
+			   LCD_CFG_MODE_SERIAL_TFT | /* General TFT panel */
 			   LCD_CFG_MODE_TFT_16BIT |
 			   LCD_CFG_PCP |
 			   LCD_CFG_NEWDES, /* 8words descriptor */
 
 		.slcd_cfg = 0,
-		.ctrl = LCD_CTRL_OFUM | LCD_CTRL_BST_16, /* 16words burst, enable out FIFO underrun irq */
-		320,
-		480,
-		60,
-		20,
-		1,
-		48,
-		40,
-		18,
-		27, //auo
+		.ctrl = LCD_CTRL_OFUM | LCD_CTRL_BST_16,	/* 16words burst, enable out FIFO underrun irq */
+		320, 480,  60, 20, 1, 48, 40, 18,27,
 	},
 
 	.osd = {
-		.osd_cfg = LCD_OSDC_OSDEN | /* Use OSD mode */
-				   //LCD_OSDC_ALPHAEN | /* enable alpha */
-				   //LCD_OSDC_F1EN |	/* enable Foreground0 */
-				   LCD_OSDC_F0EN, /* enable Foreground0 */
-		.osd_ctrl = 0,			  /* disable ipu,  */
-		.rgb_ctrl = LCD_RGBC_EVEN_GBR << LCD_RGBC_EVENRGB_BIT,
-		.bgcolor = 0x000000,		 /* set background color Black */
-		.colorkey0 = 0x80000000,	 /* disable colorkey */
-		.colorkey1 = 0x80000000,	 /* disable colorkey */
-		.alpha = 0xa0,				 /* alpha value */
-		.ipu_restart = 0x80001000,   /* ipu restart */
-		.fg_change = FG_CHANGE_ALL,  /* change all initially */
-		.fg0 = {16, 0, 0, 320, 480}, /* bpp, x, y, w, h */
-		.fg1 = {16, 0, 0, 320, 480}, /* bpp, x, y, w, h */
-	},
-
+		 .osd_cfg = LCD_OSDC_OSDEN | /* Use OSD mode */
+		 //LCD_OSDC_ALPHAEN | /* enable alpha */
+		 //LCD_OSDC_F1EN |	/* enable Foreground0 */
+		 LCD_OSDC_F0EN, /* enable Foreground0 */
+		 .osd_ctrl = 0, 	/* disable ipu,  */
+		 .rgb_ctrl = LCD_RGBC_EVEN_GBR << LCD_RGBC_EVENRGB_BIT,
+		 .bgcolor = 0x000000, /* set background color Black */
+		 .colorkey0 = 0x80000000, /* disable colorkey */
+		 .colorkey1 = 0x80000000, /* disable colorkey */
+		 .alpha = 0xa0, /* alpha value */
+		 .ipu_restart = 0x80001000, /* ipu restart */
+		 .fg_change = FG_CHANGE_ALL, /* change all initially */
+		 .fg0 = {16, 0, 0, 320,480}, /* bpp, x, y, w, h */
+		 .fg1 = {16, 0, 0, 320,480}, /* bpp, x, y, w, h */
+	 },
+ 
 #elif defined(CONFIG_JZ4760_LCD_RS97_V21)
 	.panel = {
 		.cfg = LCD_CFG_LCDPIN_LCD | LCD_CFG_RECOVER | /* Underrun recover */
@@ -2808,29 +2800,26 @@ static int jz4760fb_device_attr_unregister(struct fb_info *fb_info)
 
 static void gpio_init(void)
 {
-	__lcd_display_pin_init();
-
-	/* gpio init __gpio_as_lcd */
-	if (jz4760_lcd_info->panel.cfg & LCD_CFG_MODE_TFT_16BIT)
-		__gpio_as_lcd_16bit();
-	else if (jz4760_lcd_info->panel.cfg & LCD_CFG_MODE_TFT_24BIT)
-		__gpio_as_lcd_24bit();
-	else
-		__gpio_as_lcd_18bit();
-
-		/* In special mode, we only need init special pin,
-	 * as general lcd pin has init in uboot */
-#if defined(CONFIG_SOC_JZ4760)
-	switch (jz4760_lcd_info->panel.cfg & LCD_CFG_MODE_MASK)
-	{
-	case LCD_CFG_MODE_SPECIAL_TFT_1:
-	case LCD_CFG_MODE_SPECIAL_TFT_2:
-	case LCD_CFG_MODE_SPECIAL_TFT_3:
-		__gpio_as_lcd_special();
-		break;
-	default:;
+	__lcd_display_pin_init();  //LCD REST
+	if (jz4760_lcd_info->panel.cfg & LCD_CFG_LCDPIN_SLCD)
+		__gpio_as_lcd_8bit();
+	else if (jz4760_lcd_info->panel.cfg & LCD_CFG_MODE_SERIAL_TFT)
+	{ //__gpio_as_lcd_8bit no use lcd_de
+		REG_GPIO_PXFUNS(2) = 0x000c31fc;
+		REG_GPIO_PXTRGC(2) = 0x000c31fc;
+		REG_GPIO_PXSELC(2) = 0x000c31fc;
+		REG_GPIO_PXPES(2)  = 0x000c31fc;
 	}
-#endif
+	else
+	{
+		/* gpio init __gpio_as_lcd */
+		if (jz4760_lcd_info->panel.cfg & LCD_CFG_MODE_TFT_16BIT)
+			__gpio_as_lcd_16bit();
+		else if (jz4760_lcd_info->panel.cfg & LCD_CFG_MODE_TFT_24BIT)
+			__gpio_as_lcd_24bit();
+		else
+	 		__gpio_as_lcd_18bit();
+	}
 
 	return;
 }
@@ -2980,7 +2969,7 @@ static int __devinit jz4760_fb_probe(struct platform_device *dev)
 	struct lcd_cfb_info *cfb;
 
 	int rv = 0;
-
+	cpm_start_clock(CGM_IPU);
 	cfb = jz4760fb_alloc_fb_info();
 	if (!cfb)
 		goto failed;
@@ -2994,7 +2983,7 @@ static int __devinit jz4760_fb_probe(struct platform_device *dev)
 	set_bpp_to_ctrl_bpp();
 
 	/* init clk */
-	jz4760fb_change_clock(jz4760_lcd_info);
+	//jz4760fb_change_clock(jz4760_lcd_info);
 
 	rv = jz4760fb_map_smem(cfb);
 	if (rv)
@@ -3024,9 +3013,34 @@ static int __devinit jz4760_fb_probe(struct platform_device *dev)
 
 	ctrl_enable();
 	__lcd_display_on();
+#if defined(RGB_TEST)
+	int i = 0;
+	unsigned short*ptr;
+	ptr = (unsigned short*)lcd_frame0;
+
+	for(i = 0 ; i < LCD_SCREEN_W*LCD_SCREEN_H/3; i++)
+	{
+		*ptr++ = 0xf800;
+	}
+	
+	for(i = 0 ; i < LCD_SCREEN_W*LCD_SCREEN_H/3; i++)
+	{
+		*ptr++ = 0x07e0;
+	}
+	
+	for(i = 0 ; i < LCD_SCREEN_W*LCD_SCREEN_H/3; i++)
+	{
+		*ptr++ = 0x001f;
+	}
+	
+	dma_cache_wback((unsigned int)lcd_frame0, LCD_SCREEN_W * LCD_SCREEN_H * 2);
+	mdelay(3000);
+#else
 	memset(lcd_frame0, 0x00, LCD_SCREEN_W * LCD_SCREEN_W * 2);
 	dma_cache_wback((unsigned int)lcd_frame0, LCD_SCREEN_W * LCD_SCREEN_W * 2);
-	mdelay(50);	//needed to avoid flash white screen0
+	mdelay(50);	//needed to avoid flash white screen
+
+#endif
 	/* Really restore LCD backlight when LCD backlight is turned on. */
 	if (cfb->backlight_level) {
 #ifdef HAVE_LCD_PWM_CONTROL
