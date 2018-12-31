@@ -854,11 +854,8 @@ typedef enum
 	SW_FULL_DOUBLE
 } lcd_output_mode;
 
-static struct task_struct *ipu_task;
 static lcd_output_mode Lcd_output_mode = 0;
-static unsigned char doubleLineNeedUpdate = 0;
 static unsigned char **lcd_current = &lcd_frame0;
-unsigned int ipu_task_out = 0;
 unsigned int frame_yoffset = 0;
 
 extern void ipu_driver_close_tv(void);
@@ -1344,6 +1341,10 @@ static int jz4760fb_blank(int blank_mode, struct fb_info *info)
 static int jz4760fb_pan_display(struct fb_var_screeninfo *var, struct fb_info *info)
 {
 	struct lcd_cfb_info *cfb = (struct lcd_cfb_info *)info;
+	const int WIDTH = 320;
+	const int HEIGHT = 240;
+	const int bpp = 2;
+	int y;
 	if (!var || !cfb)
 	{
 		return -EINVAL;
@@ -1357,13 +1358,19 @@ static int jz4760fb_pan_display(struct fb_var_screeninfo *var, struct fb_info *i
 														 (frame_yoffset * cfb->fb.fix.line_length));
 		break;
 	case 1:
-		dma0_desc0->databuf = (unsigned int)virt_to_phys((void *)(*lcd_current));
 		ipu_driver_flush_tv();
 		break;
 	case 2:
+		for (y = 0; y < HEIGHT; y++)
+		{
+			memmove(ipu_buffer + (WIDTH * bpp * y * 2), lcd_frame0 + (frame_yoffset * WIDTH * bpp) + (WIDTH * bpp * y), WIDTH * bpp);
+		}
+		break;
 	case 3:
-		doubleLineNeedUpdate = 1;
-		dma0_desc0->databuf = (unsigned int)virt_to_phys((void *)(*lcd_current));
+		for (y = 0; y < HEIGHT - 1; y++)
+		{
+			memmove(ipu_buffer + (WIDTH * bpp * y * 2), lcd_frame0 + (frame_yoffset * WIDTH * bpp) + (WIDTH * bpp * y), WIDTH * bpp * 2);
+		}		
 		break;
 	}
 	dma_cache_wback((unsigned int)(dma0_desc0), sizeof(struct jz4760_lcd_dma_desc));
@@ -2927,78 +2934,6 @@ static void slcd_init(void)
 	return;
 }
 
-static int fb_double_line_thread(void *unused)
-{
-	const int WIDTH = 320;
-	const int HEIGHT = 240;
-	const int bpp = 2;
-	int y;
-
-	printk("tony's double line thread start !");
-	while (!ipu_task_out)
-	{
-		set_current_state(TASK_INTERRUPTIBLE);
-		schedule_timeout(HZ / 60);
-		if (!doubleLineNeedUpdate)
-			continue;
-		for (y = 0; y < HEIGHT; y++)
-		{
-			memmove(ipu_buffer + (WIDTH * bpp * y * 2), lcd_frame0 + (frame_yoffset * WIDTH * bpp) + (WIDTH * bpp * y), WIDTH * bpp);
-		}
-		doubleLineNeedUpdate = 0;
-	}
-	resize_task = 0;
-}
-
-static int fb_double_line_start()
-{
-	if (resize_task)
-		return;
-	ipu_task_out = 0;
-	resize_task = kthread_run(fb_double_line_thread, NULL, "fb_double_line");
-	if (IS_ERR(resize_task))
-	{
-		printk("Kernel fb_double_line_start error!\n");
-		return;
-	}
-}
-
-static int fb_double_line_progressive_thread(void *unused)
-{
-	const int WIDTH = 320;
-	const int HEIGHT = 240;
-	const int bpp = 2;
-	int y;
-
-	printk("tony's double line progressive thread start !");
-	while (!ipu_task_out)
-	{
-		set_current_state(TASK_INTERRUPTIBLE);
-		schedule_timeout(HZ / 60);
-		if (!doubleLineNeedUpdate)
-			continue;
-		for (y = 0; y < HEIGHT - 1; y++)
-		{
-			memmove(ipu_buffer + (WIDTH * bpp * y * 2), lcd_frame0 + (frame_yoffset * WIDTH * bpp) + (WIDTH * bpp * y), WIDTH * bpp * 2);
-		}
-		doubleLineNeedUpdate = 0;
-	}
-	resize_task = 0;
-}
-
-static int fb_double_line_progressive_start()
-{
-	if (resize_task)
-		return;
-	ipu_task_out = 0;
-	resize_task = kthread_run(fb_double_line_progressive_thread, NULL, "fb_double_line_progressive");
-	if (IS_ERR(resize_task))
-	{
-		printk("Kernel fb_double_line_start error!\n");
-		return;
-	}
-}
-
 static int proc_lcd_backlight_read_proc(
 	char *page, char **start, off_t off,
 	int count, int *eof, void *data)
@@ -3058,32 +2993,29 @@ static int proc_ipu_mode_write_proc(
 	switch (Lcd_output_mode)
 	{
 	case 0:
-		ipu_task_out = 1;
 		lcd_current = &lcd_frame0;
 		break;
 
 	case 1:
-		ipu_task_out = 1;
 		memset(lcd_frame0, 0x00, LCD_SCREEN_W * LCD_SCREEN_H * 4);
 		memset(ipu_buffer, 0x00, LCD_SCREEN_W * LCD_SCREEN_H * 2);
 		lcd_current = &ipu_buffer;
+		dma0_desc0->databuf = (unsigned int)virt_to_phys((void *)(*lcd_current));
 		ipu_driver_open_tv(320, 240, 320, 480);
 		break;
 
 	case 2:
-		ipu_task_out = 1;
 		memset(lcd_frame0, 0x00, LCD_SCREEN_W * LCD_SCREEN_H * 4);
 		memset(ipu_buffer, 0x00, LCD_SCREEN_W * LCD_SCREEN_H * 2);
 		lcd_current = &ipu_buffer;
-		fb_double_line_start();
+		dma0_desc0->databuf = (unsigned int)virt_to_phys((void *)(*lcd_current));
 		break;
 
 	case 3:
-		ipu_task_out = 1;
 		memset(lcd_frame0, 0x00, LCD_SCREEN_W * LCD_SCREEN_H * 4);
 		memset(ipu_buffer, 0x00, LCD_SCREEN_W * LCD_SCREEN_H * 2);
 		lcd_current = &ipu_buffer;
-		fb_double_line_progressive_start();
+		dma0_desc0->databuf = (unsigned int)virt_to_phys((void *)(*lcd_current));
 		break;
 	}
 	return count;
