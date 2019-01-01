@@ -2801,25 +2801,36 @@ static int jz4760fb_device_attr_unregister(struct fb_info *fb_info)
 static void gpio_init(void)
 {
 	__lcd_display_pin_init();  //LCD REST
-	if (jz4760_lcd_info->panel.cfg & LCD_CFG_LCDPIN_SLCD)
-		__gpio_as_lcd_8bit();
-	else if (jz4760_lcd_info->panel.cfg & LCD_CFG_MODE_SERIAL_TFT)
-	{ //__gpio_as_lcd_8bit no use lcd_de
+#if defined(CONFIG_JZ4760_LCD_RS97_V10)
 		REG_GPIO_PXFUNS(2) = 0x000c31fc;
 		REG_GPIO_PXTRGC(2) = 0x000c31fc;
 		REG_GPIO_PXSELC(2) = 0x000c31fc;
 		REG_GPIO_PXPES(2)  = 0x000c31fc;
-	}
+		return;
+#endif
+	/* gpio init __gpio_as_lcd */
+	if (jz4760_lcd_info->panel.cfg & LCD_CFG_MODE_TFT_16BIT)
+		__gpio_as_lcd_16bit();
+	else if (jz4760_lcd_info->panel.cfg & LCD_CFG_MODE_TFT_24BIT)
+		__gpio_as_lcd_24bit();
 	else
-	{
-		/* gpio init __gpio_as_lcd */
-		if (jz4760_lcd_info->panel.cfg & LCD_CFG_MODE_TFT_16BIT)
-			__gpio_as_lcd_16bit();
-		else if (jz4760_lcd_info->panel.cfg & LCD_CFG_MODE_TFT_24BIT)
-			__gpio_as_lcd_24bit();
-		else
-	 		__gpio_as_lcd_18bit();
+ 		__gpio_as_lcd_18bit();
+
+	/* In special mode, we only need init special pin,
+	 * as general lcd pin has init in uboot */
+#if defined(CONFIG_SOC_JZ4760)
+	switch (jz4760_lcd_info->panel.cfg & LCD_CFG_MODE_MASK) {
+	case LCD_CFG_MODE_SPECIAL_TFT_1:
+	case LCD_CFG_MODE_SPECIAL_TFT_2:
+	case LCD_CFG_MODE_SPECIAL_TFT_3:
+		__gpio_as_lcd_special();
+		break;
+	default:
+		;
 	}
+#endif
+
+	return;
 
 	return;
 }
