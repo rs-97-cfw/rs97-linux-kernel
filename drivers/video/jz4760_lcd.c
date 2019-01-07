@@ -369,11 +369,11 @@ struct jz4760lcd_info jz4760_lcd_panel = {
 	},
 
 	.osd = {
-		 .osd_cfg = LCD_OSDC_OSDEN | /* Use OSD mode */
-		 //LCD_OSDC_ALPHAEN | /* enable alpha */
-		 //LCD_OSDC_F1EN |	/* enable Foreground0 */
-		 LCD_OSDC_F0EN, /* enable Foreground0 */
-		 .osd_ctrl = 0, 	/* disable ipu,  */
+		.osd_cfg = LCD_OSDC_OSDEN | /* Use OSD mode */
+				   //LCD_OSDC_ALPHAEN | /* enable alpha */
+				   LCD_OSDC_F1EN,	/* enable Foreground0 */
+				   //LCD_OSDC_F0EN, /* enable Foreground0 */
+		.osd_ctrl = LCD_OSDCTRL_IPU | LCD_OSDCTRL_OSDBPP_18_24,			  /* disable ipu,  */
 		 .rgb_ctrl = LCD_RGBC_EVEN_GBR << LCD_RGBC_EVENRGB_BIT,
 		 .bgcolor = 0x000000, /* set background color Black */
 		 .colorkey0 = 0x80000000, /* disable colorkey */
@@ -447,9 +447,9 @@ struct jz4760lcd_info jz4760_lcd_panel = {
 	.osd = {
 		.osd_cfg = LCD_OSDC_OSDEN | /* Use OSD mode */
 				   //LCD_OSDC_ALPHAEN | /* enable alpha */
-				   //LCD_OSDC_F1EN |	/* enable Foreground0 */
-				   LCD_OSDC_F0EN, /* enable Foreground0 */
-		.osd_ctrl = 0,			  /* disable ipu,  */
+				   LCD_OSDC_F1EN,	/* enable Foreground0 */
+				   //LCD_OSDC_F0EN, /* enable Foreground0 */
+		.osd_ctrl = LCD_OSDCTRL_IPU | LCD_OSDCTRL_OSDBPP_18_24,			  /* disable ipu,  */
 		.rgb_ctrl = LCD_RGBC_ODD_GBR << LCD_RGBC_ODDRGB_BIT,
 		.bgcolor = 0x000000,		 /* set background color Black */
 		.colorkey0 = 0x80000000,	 /* disable colorkey */
@@ -2966,7 +2966,7 @@ static int proc_ipu_mode_write_proc(
 static int __devinit jz4760_fb_probe(struct platform_device *dev)
 {
 	struct lcd_cfb_info *cfb;
-
+	int ret;
 	int rv = 0;
 	cpm_start_clock(CGM_IPU);
 	cfb = jz4760fb_alloc_fb_info();
@@ -3046,7 +3046,11 @@ static int __devinit jz4760_fb_probe(struct platform_device *dev)
 #else
 	memset(lcd_frame0, 0x00, LCD_SCREEN_W * LCD_SCREEN_W * 2);
 	dma_cache_wback((unsigned int)lcd_frame0, LCD_SCREEN_W * LCD_SCREEN_W * 2);
-	mdelay(50);	//needed to avoid flash white screen
+	rv = jzfb_wait_for_vsync();
+	if (!rv)
+		rv = jzfb_wait_for_vsync();
+	if (rv)
+		dev_warn(&dev->dev, "Wait for vsync failed: %d\n", rv);
 
 #endif
 	/* Really restore LCD backlight when LCD backlight is turned on. */
