@@ -854,8 +854,6 @@ typedef enum
 	SW_FULL_DOUBLE
 } lcd_output_mode;
 
-static lcd_output_mode Lcd_output_mode = 0;
-//static unsigned char **lcd_current = &lcd_frame0;
 unsigned int frame_yoffset = 0;
 
 extern void ipu_driver_close_tv(void);
@@ -2905,58 +2903,7 @@ static int proc_lcd_backlight_write_proc(
 	return count;
 }
 
-static int proc_ipu_mode_read_proc(
-	char *page, char **start, off_t off,
-	int count, int *eof, void *data)
-{
-	return sprintf(page, "%lu\n", Lcd_output_mode);
-}
 
-static int proc_ipu_mode_write_proc(
-	struct file *file, const char *buffer,
-	unsigned long count, void *data)
-{
-	int tmp_output_flag;
-
-	tmp_output_flag = simple_strtoul(buffer, 0, 10);
-
-	if (tmp_output_flag != Lcd_output_mode)
-	{
-		Lcd_output_mode = tmp_output_flag;
-		ipu_driver_close_tv();
-	}
-	else
-	{
-		return count;
-	}
-
-	switch (Lcd_output_mode)
-	{
-	case 0:
-	case 1:
-		memset(lcd_frame0, 0x00, LCD_SCREEN_W * LCD_SCREEN_H * 6);
-		//memset(ipu_buffer, 0x00, LCD_SCREEN_W * LCD_SCREEN_H * 2);
-		//lcd_current = &ipu_buffer;
-		//dma0_desc0->databuf = (unsigned int)virt_to_phys((void *)(*lcd_current));
-		ipu_driver_open_tv(320, 240, 320, 480);
-		break;
-
-	case 2:
-		memset(lcd_frame0, 0x00, LCD_SCREEN_W * LCD_SCREEN_H * 6);
-		//memset(ipu_buffer, 0x00, LCD_SCREEN_W * LCD_SCREEN_H * 2);
-		//lcd_current = &ipu_buffer;
-		//dma0_desc0->databuf = (unsigned int)virt_to_phys((void *)(*lcd_current));
-		break;
-
-	case 3:
-		memset(lcd_frame0, 0x00, LCD_SCREEN_W * LCD_SCREEN_H * 6);
-		//memset(ipu_buffer, 0x00, LCD_SCREEN_W * LCD_SCREEN_H * 2);
-		//lcd_current = &ipu_buffer;
-		//dma0_desc0->databuf = (unsigned int)virt_to_phys((void *)(*lcd_current));
-		break;
-	}
-	return count;
-}
 
 static int __devinit jz4760_fb_probe(struct platform_device *dev)
 {
@@ -2987,6 +2934,18 @@ static int __devinit jz4760_fb_probe(struct platform_device *dev)
 
 	jz4760fb_deep_set_mode(jz4760_lcd_info);
 
+	
+	ipu_driver_open_tv(320, 240, 320, 480);
+	memset(lcd_frame0, 0x00, LCD_SCREEN_W * LCD_SCREEN_H * 6);
+	dma_cache_wback_inv((unsigned int)lcd_frame0, LCD_SCREEN_W * LCD_SCREEN_H * 6);
+	rv = jzfb_wait_for_vsync();
+	if (!rv)
+		rv = jzfb_wait_for_vsync();
+	if (rv)
+		dev_warn(&dev->dev, "Wait for vsync failed: %d\n", rv);
+
+	
+	
 	rv = register_framebuffer(&cfb->fb);
 	if (rv < 0)
 	{
@@ -3016,6 +2975,7 @@ static int __devinit jz4760_fb_probe(struct platform_device *dev)
 
 	ctrl_enable();
 	__lcd_display_on();
+		
 #if defined(RGB_TEST)
 	int i = 0;
 	unsigned short*ptr;
@@ -3038,15 +2998,6 @@ static int __devinit jz4760_fb_probe(struct platform_device *dev)
 	
 	dma_cache_wback((unsigned int)lcd_frame0, LCD_SCREEN_W * LCD_SCREEN_H * 2);
 	mdelay(3000);
-#else
-	memset(lcd_frame0, 0x00, LCD_SCREEN_W * LCD_SCREEN_W * 2);
-	dma_cache_wback((unsigned int)lcd_frame0, LCD_SCREEN_W * LCD_SCREEN_W * 2);
-	rv = jzfb_wait_for_vsync();
-	if (!rv)
-		rv = jzfb_wait_for_vsync();
-	if (rv)
-		dev_warn(&dev->dev, "Wait for vsync failed: %d\n", rv);
-
 #endif
 	/* Really restore LCD backlight when LCD backlight is turned on. */
 	if (cfb->backlight_level) {
@@ -3105,14 +3056,6 @@ static int __init jz4760_fb_init(void)
 	{
 		res->read_proc = proc_lcd_backlight_read_proc;
 		res->write_proc = proc_lcd_backlight_write_proc;
-	}
-
-	res = create_proc_entry("jz/ipu_mode", 0, NULL);
-	if(res)
-	{
-		res->read_proc = proc_ipu_mode_read_proc;
-		res->write_proc = proc_ipu_mode_write_proc;
-		res->data = NULL;
 	}
 
 	return platform_driver_register(&jz4760_fb_driver);
