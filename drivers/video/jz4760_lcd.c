@@ -409,9 +409,9 @@ struct jz4760lcd_info jz4760_lcd_panel = {
 	.osd = {
 		.osd_cfg = LCD_OSDC_OSDEN | /* Use OSD mode */
 				   //LCD_OSDC_ALPHAEN | /* enable alpha */
-				   //LCD_OSDC_F1EN |	/* enable Foreground0 */
-				   LCD_OSDC_F0EN, /* enable Foreground0 */
-		.osd_ctrl = 0,			  /* disable ipu,  */
+				   LCD_OSDC_F1EN,	/* enable Foreground0 */
+				   //LCD_OSDC_F0EN, /* enable Foreground0 */
+		.osd_ctrl = LCD_OSDCTRL_IPU | LCD_OSDCTRL_OSDBPP_18_24,			  /* disable ipu,  */
 		.rgb_ctrl = LCD_RGBC_EVEN_GBR << LCD_RGBC_EVENRGB_BIT,
 		.bgcolor = 0x000000,		 /* set background color Black */
 		.colorkey0 = 0x80000000,	 /* disable colorkey */
@@ -825,7 +825,7 @@ unsigned char *lcd_frame0, *lcd_frame1;
 
 unsigned int backlight_value = 80;
 
-unsigned char *ipu_buffer;
+//unsigned char *ipu_buffer;
 static struct task_struct *resize_task;
 
 #define LCD_SCREEN_W 320
@@ -850,12 +850,13 @@ typedef enum
 } lcd_output_mode;
 
 static lcd_output_mode Lcd_output_mode = 0;
-static unsigned char **lcd_current = &lcd_frame0;
+//static unsigned char **lcd_current = &lcd_frame0;
 unsigned int frame_yoffset = 0;
 
 extern void ipu_driver_close_tv(void);
 extern void ipu_driver_open_tv(int, int, int, int);
 extern void ipu_driver_flush_tv(void);
+extern void ipu_update_address();
 extern void ipu_driver_wait_end();
 
 //END OF TONY IPU
@@ -1349,23 +1350,23 @@ static int jz4760fb_pan_display(struct fb_var_screeninfo *var, struct fb_info *i
 	switch (Lcd_output_mode)
 	{
 	case 0:
-		dma0_desc0->databuf = (unsigned int)virt_to_phys((void *)(*lcd_current) +
-														 (frame_yoffset * cfb->fb.fix.line_length));
-		break;
 	case 1:
-		ipu_driver_flush_tv();
+		dma0_desc0->databuf = (unsigned int)virt_to_phys((void *)(*lcd_frame0) +
+														 (frame_yoffset * cfb->fb.fix.line_length));
+		ipu_update_address();
+		//ipu_driver_flush_tv();
 		break;
 	case 2:
-		for (y = 0; y < HEIGHT; y++)
-		{
-			memmove(ipu_buffer + (WIDTH * bpp * y * 2), lcd_frame0 + (frame_yoffset * WIDTH * bpp) + (WIDTH * bpp * y), WIDTH * bpp);
-		}
+		// for (y = 0; y < HEIGHT; y++)
+		// {
+			// memmove(ipu_buffer + (WIDTH * bpp * y * 2), lcd_frame0 + (frame_yoffset * WIDTH * bpp) + (WIDTH * bpp * y), WIDTH * bpp);
+		// }
 		break;
 	case 3:
-		for (y = 0; y < HEIGHT - 1; y++)
-		{
-			memmove(ipu_buffer + (WIDTH * bpp * y * 2), lcd_frame0 + (frame_yoffset * WIDTH * bpp) + (WIDTH * bpp * y), WIDTH * bpp * 2);
-		}		
+		// for (y = 0; y < HEIGHT - 1; y++)
+		// {
+			// memmove(ipu_buffer + (WIDTH * bpp * y * 2), lcd_frame0 + (frame_yoffset * WIDTH * bpp) + (WIDTH * bpp * y), WIDTH * bpp * 2);
+		// }		
 		break;
 	}
 	dma_cache_wback((unsigned int)(dma0_desc0), sizeof(struct jz4760_lcd_dma_desc));
@@ -1641,7 +1642,7 @@ static int jz4760fb_map_smem(struct lcd_cfb_info *cfb)
 
 	lcd_palette = (unsigned char *)__get_free_pages(GFP_KERNEL, 0);
 	lcd_frame0 = alloc_pages_exact(size, GFP_KERNEL);
-	ipu_buffer = lcd_frame0 + (MAX_XRES * MAX_YRES * 4 * 2);
+	//ipu_buffer = lcd_frame0 + (MAX_XRES * MAX_YRES * 4 * 2);
 	//TONY IPU
 
 	if ((!lcd_palette) || (!lcd_frame0))
@@ -2049,6 +2050,7 @@ static void jz4760fb_set_panel_mode(struct jz4760lcd_info *lcd_info)
 
 static void jz4760fb_set_osd_mode(struct jz4760lcd_info *lcd_info)
 {
+	struct jz4760lcd_panel_t *panel = &lcd_info->panel;
 	D("%s, %d\n", __FILE__, __LINE__);
 	lcd_info->osd.osd_ctrl &= ~(LCD_OSDCTRL_OSDBPP_MASK);
 	if (lcd_info->osd.fg1.bpp == 15)
@@ -2069,7 +2071,9 @@ static void jz4760fb_set_osd_mode(struct jz4760lcd_info *lcd_info)
 	REG_LCD_KEY0 = lcd_info->osd.colorkey0;
 	REG_LCD_KEY1 = lcd_info->osd.colorkey1;
 	REG_LCD_ALPHA = lcd_info->osd.alpha;
-	REG_LCD_IPUR = lcd_info->osd.ipu_restart;
+
+	REG_LCD_IPUR = LCD_IPUR_IPUREN |
+			(panel->blw + panel->w + panel->elw) * panel->vsw / 3;
 }
 
 static void jz4760fb_foreground_resize(struct jz4760lcd_info *lcd_info)
@@ -2947,29 +2951,26 @@ static int proc_ipu_mode_write_proc(
 	switch (Lcd_output_mode)
 	{
 	case 0:
-		lcd_current = &lcd_frame0;
-		break;
-
 	case 1:
-		memset(lcd_frame0, 0x00, LCD_SCREEN_W * LCD_SCREEN_H * 4);
-		memset(ipu_buffer, 0x00, LCD_SCREEN_W * LCD_SCREEN_H * 2);
-		lcd_current = &ipu_buffer;
-		dma0_desc0->databuf = (unsigned int)virt_to_phys((void *)(*lcd_current));
+		memset(lcd_frame0, 0x00, LCD_SCREEN_W * LCD_SCREEN_H * 6);
+		//memset(ipu_buffer, 0x00, LCD_SCREEN_W * LCD_SCREEN_H * 2);
+		//lcd_current = &ipu_buffer;
+		//dma0_desc0->databuf = (unsigned int)virt_to_phys((void *)(*lcd_current));
 		ipu_driver_open_tv(320, 240, 320, 480);
 		break;
 
 	case 2:
-		memset(lcd_frame0, 0x00, LCD_SCREEN_W * LCD_SCREEN_H * 4);
-		memset(ipu_buffer, 0x00, LCD_SCREEN_W * LCD_SCREEN_H * 2);
-		lcd_current = &ipu_buffer;
-		dma0_desc0->databuf = (unsigned int)virt_to_phys((void *)(*lcd_current));
+		memset(lcd_frame0, 0x00, LCD_SCREEN_W * LCD_SCREEN_H * 6);
+		//memset(ipu_buffer, 0x00, LCD_SCREEN_W * LCD_SCREEN_H * 2);
+		//lcd_current = &ipu_buffer;
+		//dma0_desc0->databuf = (unsigned int)virt_to_phys((void *)(*lcd_current));
 		break;
 
 	case 3:
-		memset(lcd_frame0, 0x00, LCD_SCREEN_W * LCD_SCREEN_H * 4);
-		memset(ipu_buffer, 0x00, LCD_SCREEN_W * LCD_SCREEN_H * 2);
-		lcd_current = &ipu_buffer;
-		dma0_desc0->databuf = (unsigned int)virt_to_phys((void *)(*lcd_current));
+		memset(lcd_frame0, 0x00, LCD_SCREEN_W * LCD_SCREEN_H * 6);
+		//memset(ipu_buffer, 0x00, LCD_SCREEN_W * LCD_SCREEN_H * 2);
+		//lcd_current = &ipu_buffer;
+		//dma0_desc0->databuf = (unsigned int)virt_to_phys((void *)(*lcd_current));
 		break;
 	}
 	return count;
@@ -3014,13 +3015,13 @@ static int __devinit jz4760_fb_probe(struct platform_device *dev)
 
 	jz4760fb_device_attr_register(&cfb->fb);
 
-	if (request_irq(IRQ_LCD, jz4760fb_interrupt_handler, IRQF_DISABLED,
-					"lcd", 0))
-	{
-		D("Faield to request LCD IRQ.\n");
-		rv = -EBUSY;
-		goto failed;
-	}
+	// if (request_irq(IRQ_LCD, jz4760fb_interrupt_handler, IRQF_DISABLED,
+					// "lcd", 0))
+	// {
+		// D("Faield to request LCD IRQ.\n");
+		// rv = -EBUSY;
+		// goto failed;
+	// }
 
 	ctrl_enable();
 	__lcd_display_on();
