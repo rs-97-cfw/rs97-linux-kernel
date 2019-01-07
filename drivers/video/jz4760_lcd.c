@@ -820,6 +820,11 @@ static unsigned char *lcd_palette;
 unsigned char *lcd_frame0, *lcd_frame1;
 
 //TONY IPU
+uint32_t vsync_count;
+spinlock_t lock;
+wait_queue_head_t wait_vsync;
+unsigned int delay_flush;
+
 #define MAX_XRES 640
 #define MAX_YRES 480
 
@@ -1289,6 +1294,16 @@ static int jz4760fb_check_var(struct fb_var_screeninfo *var, struct fb_info *inf
 	return 0;
 }
 
+static int jzfb_wait_for_vsync()
+{
+	uint32_t count = vsync_count;
+	long t = wait_event_interruptible_timeout(wait_vsync,
+						  count != vsync_count,
+						  HZ / 10);
+	return t > 0 ? 0 : (t < 0 ? (int)t : -ETIMEDOUT);
+}
+
+
 /*
  * set the video mode according to info->var
  */
@@ -1345,31 +1360,14 @@ static int jz4760fb_pan_display(struct fb_var_screeninfo *var, struct fb_info *i
 	{
 		return -EINVAL;
 	}
+	spin_lock_irq(&lock);
 	frame_yoffset = var->yoffset;
-
-	switch (Lcd_output_mode)
-	{
-	case 0:
-	case 1:
-		dma0_desc0->databuf = (unsigned int)virt_to_phys((void *)(*lcd_frame0) +
-														 (frame_yoffset * cfb->fb.fix.line_length));
-		ipu_update_address();
-		//ipu_driver_flush_tv();
-		break;
-	case 2:
-		// for (y = 0; y < HEIGHT; y++)
-		// {
-			// memmove(ipu_buffer + (WIDTH * bpp * y * 2), lcd_frame0 + (frame_yoffset * WIDTH * bpp) + (WIDTH * bpp * y), WIDTH * bpp);
-		// }
-		break;
-	case 3:
-		// for (y = 0; y < HEIGHT - 1; y++)
-		// {
-			// memmove(ipu_buffer + (WIDTH * bpp * y * 2), lcd_frame0 + (frame_yoffset * WIDTH * bpp) + (WIDTH * bpp * y), WIDTH * bpp * 2);
-		// }		
-		break;
-	}
-	dma_cache_wback((unsigned int)(dma0_desc0), sizeof(struct jz4760_lcd_dma_desc));
+	delay_flush = 8;
+	dma_cache_wback_inv((unsigned long)(lcd_frame0 +
+					frame_yoffset * cfb->fb.fix.line_length),
+				cfb->fb.fix.line_length * cfb->fb.var.yres);
+	spin_unlock_irq(&lock);
+	jzfb_wait_for_vsync();
 
 	return 0;
 }
@@ -2344,38 +2342,27 @@ static void jz4760fb_deep_set_mode(struct jz4760lcd_info *lcd_info)
 
 static irqreturn_t jz4760fb_interrupt_handler(int irq, void *dev_id)
 {
-	unsigned int state;
-	static int irqcnt = 0;
+	struct lcd_cfb_info *cfb = dev_id;
 
-	state = REG_LCD_STATE;
-	D("In the lcd interrupt handler, state=0x%x\n", state);
 
-	if (state & LCD_STATE_EOF) /* End of frame */
-		REG_LCD_STATE = state & ~LCD_STATE_EOF;
+	spin_lock(&lock);
+	//SETREG32(IPU_STATUS,0);
+	//writel(0, jzfb->ipu_base + IPU_STATUS);
 
-	if (state & LCD_STATE_IFU0)
-	{
-		printk("%s, InFiFo0 underrun\n", __FUNCTION__);
-		REG_LCD_STATE = state & ~LCD_STATE_IFU0;
+	if (delay_flush == 0) {
+	dma_cache_wback_inv((unsigned long)(lcd_frame0 +
+					frame_yoffset * cfb->fb.fix.line_length),
+				cfb->fb.fix.line_length * cfb->fb.var.yres);
+	} else {
+		delay_flush--;
 	}
 
-	if (state & LCD_STATE_IFU1)
-	{
-		printk("%s, InFiFo1 underrun\n", __FUNCTION__);
-		REG_LCD_STATE = state & ~LCD_STATE_IFU1;
-	}
+	ipu_update_address();
+	vsync_count++;
 
-	if (state & LCD_STATE_OFU)
-	{ /* Out fifo underrun */
-		REG_LCD_STATE = state & ~LCD_STATE_OFU;
-		if (irqcnt++ > 100)
-		{
-			__lcd_disable_ofu_intr();
-			printk("disable Out FiFo underrun irq.\n");
-		}
-		printk("%s, Out FiFo underrun.\n", __FUNCTION__);
-	}
+	spin_unlock(&lock);
 
+	wake_up_interruptible_all(&wait_vsync);
 	return IRQ_HANDLED;
 }
 
@@ -2993,6 +2980,8 @@ static int __devinit jz4760_fb_probe(struct platform_device *dev)
 	slcd_init();
 
 	set_bpp_to_ctrl_bpp();
+	init_waitqueue_head(&wait_vsync);
+	spin_lock_init(&lock);
 
 	/* init clk */
 	//jz4760fb_change_clock(jz4760_lcd_info);
@@ -3014,6 +3003,13 @@ static int __devinit jz4760_fb_probe(struct platform_device *dev)
 		   cfb->fb.node, cfb->fb.fix.id, cfb->fb.fix.smem_len >> 10);
 
 	jz4760fb_device_attr_register(&cfb->fb);
+	int irq = platform_get_irq(dev, 0);
+	if (devm_request_irq(&dev->dev, IRQ_IPU,
+				jz4760fb_interrupt_handler, 0, "ipu", cfb)) 
+	{
+		dev_err(&dev->dev, "Failed to request IRQ.\n");
+		goto failed;
+	}
 
 	// if (request_irq(IRQ_LCD, jz4760fb_interrupt_handler, IRQF_DISABLED,
 					// "lcd", 0))
