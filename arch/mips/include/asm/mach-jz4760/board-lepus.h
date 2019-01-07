@@ -225,12 +225,15 @@
 #define JZ_EXTAL		12000000  /* Main extal freq:	12 MHz */
 #define JZ_EXTAL2		32768     /* RTC extal freq:	32.768 KHz */
 
+#define __GPIO(p, n) (32 * (p - 'A') + n)
 
 #define GPIO_SD0_VCC_EN_N	 0 //boot card
 #define GPIO_SD0_CD_N		UNUSED_GPIO_PIN
 #define GPIO_SD2_VCC_EN_N	GPF03 //tf
 #define GPIO_SD2_CD_N		GPF00
 
+#define GPIO_SD1_VCC_EN_N	UNUSED_GPIO_PIN
+#define GPIO_SD1_CD_N		UNUSED_GPIO_PIN
 
 /*====================================================================
  *  ADKEYS LEVEL
@@ -271,6 +274,9 @@
 #define MSC2_HOTPLUG_IRQ	(IRQ_GPIO_0 + GPIO_SD2_CD_N)
 #define ACTIVE_LOW_MSC0_CD	1
 #define ACTIVE_LOW_MSC2_CD	1
+#define MSC1_HOTPLUG_PIN	GPIO_SD1_CD_N
+#define MSC1_HOTPLUG_IRQ	(IRQ_GPIO_0 + MSC1_HOTPLUG_PIN)
+#define ACTIVE_LOW_MSC1_CD	1
 
 
 #define __msc0_enable_power()			\
@@ -294,6 +300,31 @@ do {						\
 	__gpio_set_pin(GPIO_SD2_VCC_EN_N);	\
 } while (0)
 
+#define __msc1_enable_power()			\
+do {						\
+	__gpio_clear_pin(GPIO_SD1_VCC_EN_N);	\
+} while (0)
+
+#define __msc1_disable_power()			\
+do {						\
+	__gpio_set_pin(GPIO_SD1_VCC_EN_N);	\
+} while (0)
+
+/*======================================================================
+ * SPI 
+ */
+#define  GPIO_SSI0_CE0	(32*1+29)
+#define  GPIO_SSI0_CE1	(32*1+31)
+#define  GPIO_SSI0_GPC	(32*1+30)
+#define  GPIO_SSI1_CE0	(32*3+29)
+#define  GPIO_SSI1_CE1	(32*3+30)
+
+#define	 SPI_CHIPSELECT_NUM_A		GPIO_SSI0_CE0
+#define	 SPI_CHIPSELECT_NUM_B		GPIO_SSI0_CE1
+#define	 SPI_CHIPSELECT_NUM_C		GPIO_SSI1_CE0
+
+#define  SPI0_BUS		0
+#define  SPI1_BUS		1
 
 /*======================================================================
  * LCD backlight

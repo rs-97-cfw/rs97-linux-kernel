@@ -20,6 +20,7 @@
 
 #include <asm/jzsoc.h>
 #include <linux/usb/musb.h>
+#include <../sound/oss/jz_audio.h>
 #include <linux/spi/spi.h>
 
 extern void __init board_msc_init(void);
@@ -210,6 +211,20 @@ int __init jz_add_msc_devices(unsigned int id, struct jz_mmc_platform_data *plat
 	return platform_device_register(pdev);
 }
 
+/* + Sound device */
+#define SND(num, desc) { .name = desc, .id = num }
+static struct snd_endpoint snd_endpoints_list[] = {
+	SND(0, "HANDSET"),
+	SND(1, "SPEAKER"),
+	SND(2, "HEADSET"),
+};
+#undef SND
+
+static struct jz_snd_endpoints vogue_snd_endpoints = {
+	.endpoints = snd_endpoints_list,
+	.num = ARRAY_SIZE(snd_endpoints_list),
+};
+
 static struct platform_device vogue_snd_device = {
 	.name = "mixer",
 	.id = -1,
@@ -273,7 +288,7 @@ static struct platform_device rtc_device = {
 	.id		= -1,
 };
 
-
+#ifdef CONFIG_JZ_AX88796C
 /** AX88796C controller **/
 static struct resource ax88796c_resources[] = {
 	[0] = {
@@ -300,6 +315,7 @@ static struct platform_device ax88796c_dev = {
 	.num_resources  = ARRAY_SIZE(ax88796c_resources),
 	.resource       = ax88796c_resources,
 };
+#endif /* CONFIG_JZ_AX88796C */
 
 ///////////////////////////////////
 
@@ -393,8 +409,9 @@ static struct platform_device *jz_platform_devices[] __initdata = {
 	// &jz_msc0_device,
 	// &jz_msc1_device,
 	&rtc_device,
-
+#ifdef CONFIG_JZ_AX88796C
 	&ax88796c_dev,
+#endif
 };
 
 extern void __init board_i2c_init(void);

@@ -211,7 +211,6 @@ int __init jz_add_msc_devices(unsigned int id, struct jz_mmc_platform_data *plat
 	return platform_device_register(pdev);
 }
 
-
 /* + Sound device */
 #define SND(num, desc) { .name = desc, .id = num }
 static struct snd_endpoint snd_endpoints_list[] = {
@@ -317,7 +316,6 @@ static struct platform_device ax88796c_dev = {
 	.resource       = ax88796c_resources,
 };
 #endif /* CONFIG_JZ_AX88796C */
-
 
 ///////////////////////////////////
 
