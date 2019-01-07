@@ -1352,19 +1352,15 @@ static int jz4760fb_blank(int blank_mode, struct fb_info *info)
 static int jz4760fb_pan_display(struct fb_var_screeninfo *var, struct fb_info *info)
 {
 	struct lcd_cfb_info *cfb = (struct lcd_cfb_info *)info;
-	const int WIDTH = 320;
-	const int HEIGHT = 240;
-	const int bpp = 2;
-	int y;
 	if (!var || !cfb)
 	{
 		return -EINVAL;
 	}
 	spin_lock_irq(&lock);
-	frame_yoffset = var->yoffset;
+
+	frame_yoffset = var->yoffset * cfb->fb.fix.line_length;
 	delay_flush = 8;
-	dma_cache_wback_inv((unsigned long)(lcd_frame0 +
-					frame_yoffset * cfb->fb.fix.line_length),
+	dma_cache_wback_inv((unsigned long)(lcd_frame0 + frame_yoffset),
 				cfb->fb.fix.line_length * cfb->fb.var.yres);
 	spin_unlock_irq(&lock);
 	jzfb_wait_for_vsync();
@@ -2350,8 +2346,7 @@ static irqreturn_t jz4760fb_interrupt_handler(int irq, void *dev_id)
 	//writel(0, jzfb->ipu_base + IPU_STATUS);
 
 	if (delay_flush == 0) {
-	dma_cache_wback_inv((unsigned long)(lcd_frame0 +
-					frame_yoffset * cfb->fb.fix.line_length),
+	dma_cache_wback_inv((unsigned long)(lcd_frame0 + frame_yoffset),
 				cfb->fb.fix.line_length * cfb->fb.var.yres);
 	} else {
 		delay_flush--;
