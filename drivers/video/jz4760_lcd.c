@@ -2924,9 +2924,16 @@ static int __devinit jz4760_fb_probe(struct platform_device *dev)
 	set_bpp_to_ctrl_bpp();
 	init_waitqueue_head(&wait_vsync);
 	spin_lock_init(&lock);
-
+	delay_flush = 0;
 	/* init clk */
 	//jz4760fb_change_clock(jz4760_lcd_info);
+	jz4760fb_device_attr_register(&cfb->fb);
+	if (devm_request_irq(&dev->dev, IRQ_IPU,
+				jz4760fb_interrupt_handler, 0, "ipu", cfb)) 
+	{
+		dev_err(&dev->dev, "Failed to request IRQ.\n");
+		goto failed;
+	}
 
 	rv = jz4760fb_map_smem(cfb);
 	if (rv)
@@ -2934,18 +2941,12 @@ static int __devinit jz4760_fb_probe(struct platform_device *dev)
 
 	
 	
+	
 	ipu_driver_open_tv(320, 240, 320, 480);
-	jz4760fb_deep_set_mode(jz4760_lcd_info);
-	memset(lcd_frame0, 0x00, LCD_SCREEN_W * LCD_SCREEN_H * 6);
-	dma_cache_wback_inv((unsigned int)lcd_frame0, LCD_SCREEN_W * LCD_SCREEN_H * 6);
-	rv = jzfb_wait_for_vsync();
-	if (!rv)
-		rv = jzfb_wait_for_vsync();
-	if (rv)
-		dev_warn(&dev->dev, "Wait for vsync failed: %d\n", rv);
+	ipu_update_address();
 
-	
-	
+	jz4760fb_deep_set_mode(jz4760_lcd_info);
+		
 	rv = register_framebuffer(&cfb->fb);
 	if (rv < 0)
 	{
@@ -2956,14 +2957,6 @@ static int __devinit jz4760_fb_probe(struct platform_device *dev)
 	printk("fb%d: %s frame buffer device, using %dK of video memory\n",
 		   cfb->fb.node, cfb->fb.fix.id, cfb->fb.fix.smem_len >> 10);
 
-	jz4760fb_device_attr_register(&cfb->fb);
-	int irq = platform_get_irq(dev, 0);
-	if (devm_request_irq(&dev->dev, IRQ_IPU,
-				jz4760fb_interrupt_handler, 0, "ipu", cfb)) 
-	{
-		dev_err(&dev->dev, "Failed to request IRQ.\n");
-		goto failed;
-	}
 
 	// if (request_irq(IRQ_LCD, jz4760fb_interrupt_handler, IRQF_DISABLED,
 					// "lcd", 0))
@@ -2974,6 +2967,7 @@ static int __devinit jz4760_fb_probe(struct platform_device *dev)
 	// }
 
 	ctrl_enable();
+	
 	__lcd_display_on();
 		
 #if defined(RGB_TEST)
@@ -2998,7 +2992,16 @@ static int __devinit jz4760_fb_probe(struct platform_device *dev)
 	
 	dma_cache_wback((unsigned int)lcd_frame0, LCD_SCREEN_W * LCD_SCREEN_H * 2);
 	mdelay(3000);
+#else
+	memset(lcd_frame0, 0x00, LCD_SCREEN_W * LCD_SCREEN_H * 6);
+	dma_cache_wback_inv((unsigned int)lcd_frame0, LCD_SCREEN_W * LCD_SCREEN_H * 6);
+
 #endif
+	//Avoid whie flash
+	
+	
+	mdelay(120);
+
 	/* Really restore LCD backlight when LCD backlight is turned on. */
 	if (cfb->backlight_level) {
 #ifdef HAVE_LCD_PWM_CONTROL
