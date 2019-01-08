@@ -373,7 +373,7 @@ struct jz4760lcd_info jz4760_lcd_panel = {
 				   //LCD_OSDC_ALPHAEN | /* enable alpha */
 				   LCD_OSDC_F1EN,	/* enable Foreground0 */
 				   //LCD_OSDC_F0EN, /* enable Foreground0 */
-		.osd_ctrl = LCD_OSDCTRL_IPU | LCD_OSDCTRL_OSDBPP_18_24,			  /* disable ipu,  */
+		.osd_ctrl = LCD_OSDCTRL_IPU | LCD_OSDCTRL_OSDBPP_15_16,			  /* disable ipu,  */
 		 .rgb_ctrl = LCD_RGBC_EVEN_GBR << LCD_RGBC_EVENRGB_BIT,
 		 .bgcolor = 0x000000, /* set background color Black */
 		 .colorkey0 = 0x80000000, /* disable colorkey */
@@ -411,7 +411,7 @@ struct jz4760lcd_info jz4760_lcd_panel = {
 				   //LCD_OSDC_ALPHAEN | /* enable alpha */
 				   LCD_OSDC_F1EN,	/* enable Foreground0 */
 				   //LCD_OSDC_F0EN, /* enable Foreground0 */
-		.osd_ctrl = LCD_OSDCTRL_IPU | LCD_OSDCTRL_OSDBPP_18_24,			  /* disable ipu,  */
+		.osd_ctrl = LCD_OSDCTRL_IPU | LCD_OSDCTRL_OSDBPP_15_16,			  /* disable ipu,  */
 		.rgb_ctrl = LCD_RGBC_EVEN_GBR << LCD_RGBC_EVENRGB_BIT,
 		.bgcolor = 0x000000,		 /* set background color Black */
 		.colorkey0 = 0x80000000,	 /* disable colorkey */
@@ -449,7 +449,7 @@ struct jz4760lcd_info jz4760_lcd_panel = {
 				   //LCD_OSDC_ALPHAEN | /* enable alpha */
 				   LCD_OSDC_F1EN,	/* enable Foreground0 */
 				   //LCD_OSDC_F0EN, /* enable Foreground0 */
-		.osd_ctrl = LCD_OSDCTRL_IPU | LCD_OSDCTRL_OSDBPP_18_24,			  /* disable ipu,  */
+		.osd_ctrl = LCD_OSDCTRL_IPU | LCD_OSDCTRL_OSDBPP_15_16,			  /* disable ipu,  */
 		.rgb_ctrl = LCD_RGBC_ODD_GBR << LCD_RGBC_ODDRGB_BIT,
 		.bgcolor = 0x000000,		 /* set background color Black */
 		.colorkey0 = 0x80000000,	 /* disable colorkey */
@@ -2932,10 +2932,10 @@ static int __devinit jz4760_fb_probe(struct platform_device *dev)
 	if (rv)
 		goto failed;
 
-	jz4760fb_deep_set_mode(jz4760_lcd_info);
-
+	
 	
 	ipu_driver_open_tv(320, 240, 320, 480);
+	jz4760fb_deep_set_mode(jz4760_lcd_info);
 	memset(lcd_frame0, 0x00, LCD_SCREEN_W * LCD_SCREEN_H * 6);
 	dma_cache_wback_inv((unsigned int)lcd_frame0, LCD_SCREEN_W * LCD_SCREEN_H * 6);
 	rv = jzfb_wait_for_vsync();
