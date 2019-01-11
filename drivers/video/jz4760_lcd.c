@@ -366,6 +366,8 @@ struct jz4760lcd_info jz4760_lcd_panel = {
 		.slcd_cfg = 0,
 		.ctrl = LCD_CTRL_OFUM | LCD_CTRL_BST_16,	/* 16words burst, enable out FIFO underrun irq */
 		320, 480,  60, 20, 1, 48, 40, 18,27,
+	  //320, 240, 60, 50, 1, 10, 70, 5, 5,
+
 	},
 
 	.osd = {
@@ -390,21 +392,14 @@ struct jz4760lcd_info jz4760_lcd_panel = {
 		.cfg = LCD_CFG_LCDPIN_LCD | LCD_CFG_RECOVER | /* Underrun recover */
 			   LCD_CFG_MODE_SERIAL_TFT |			  /* General TFT panel */
 			   LCD_CFG_MODE_TFT_16BIT |
-			   LCD_CFG_PCP |
-			   LCD_CFG_NEWDES, /* 8words descriptor */
+			   LCD_CFG_PCP,	/* Vsync polarity: leading edge is falling edge */
 
 		.slcd_cfg = 0,
 		.ctrl = LCD_CTRL_OFUM | LCD_CTRL_BST_16, /* 16words burst, enable out FIFO underrun irq */
-		320,
-		480,
-		60,
-		20,
-		1,
-		32,
-		40,
-		17,
-		27, //INNOLUX
-	},
+	/*  dw, dh, fclk, hsw, vsw, elw, blw, efw, bfw */
+		320, 480, 60, 20, 1, 32, 40, 17, 27, //INNOLUX
+
+},
 
 	.osd = {
 		.osd_cfg = LCD_OSDC_OSDEN | /* Use OSD mode */
@@ -433,15 +428,7 @@ struct jz4760lcd_info jz4760_lcd_panel = {
 
 		.slcd_cfg = 0,
 		.ctrl = LCD_CTRL_OFUM | LCD_CTRL_BST_16, /* 16words burst, enable out FIFO underrun irq */
-		320,
-		480,
-		120,
-		20,
-		1,
-		48,
-		40,
-		10,
-		42, //ILI8965
+		320, 480, 120, 20, 1, 48, 40, 10, 42, //ILI8965
 	},
 
 	.osd = {
@@ -780,18 +767,6 @@ static void print_lcdc_registers(void)	/* debug */
 	printk("REG_TVE_WSSCFG3:\t0x%08x\n", REG_TVE_WSSCFG3);
 
 	printk("==================================\n");
-#if 0
-	if ( 0 ) {
-		unsigned int * pii = (unsigned int *)dma_desc_base;
-		int i, j;
-		for (j=0;j< DMA_DESC_NUM ; j++) {
-			printk("dma_desc%d(0x%08x):\n", j, (unsigned int)pii);
-			for (i =0; i<8; i++ ) {
-				printk("\t\t0x%08x\n", *pii++);
-			}
-		}
-	}
-#endif
 }
 #else
 #define print_lcdc_registers()
@@ -811,10 +786,7 @@ struct lcd_cfb_info
 };
 
 static struct lcd_cfb_info *jz4760fb_info;
-static struct jz4760_lcd_dma_desc *dma_desc_base;
-static struct jz4760_lcd_dma_desc *dma0_desc_palette, *dma0_desc0, *dma0_desc1, *dma1_desc0, *dma1_desc1;
 
-#define DMA_DESC_NUM 6
 
 static unsigned char *lcd_palette;
 unsigned char *lcd_frame0, *lcd_frame1;
@@ -864,7 +836,6 @@ extern void ipu_driver_wait_end();
 
 //END OF TONY IPU
 
-static struct jz4760_lcd_dma_desc *dma0_desc_cmd0, *dma0_desc_cmd;
 static unsigned char *lcd_cmdbuf;
 
 static void jz4760fb_set_mode(struct jz4760lcd_info *lcd_info);
@@ -1640,7 +1611,6 @@ static int jz4760fb_map_smem(struct lcd_cfb_info *cfb)
 	if ((!lcd_palette) || (!lcd_frame0))
 		return -ENOMEM;
 
-	dma_desc_base = (struct jz4760_lcd_dma_desc *)((void *)lcd_palette + ((PALETTE_SIZE + 3) / 4) * 4);
 
 #if defined(CONFIG_FB_JZ4760_SLCD)
 	lcd_cmdbuf = (unsigned char *)__get_free_pages(GFP_KERNEL, 0);
@@ -1751,236 +1721,6 @@ static void jz4760fb_unmap_smem(struct lcd_cfb_info *cfb)
 	}
 }
 
-/* initial dma descriptors */
-static void jz4760fb_descriptor_init(struct jz4760lcd_info *lcd_info)
-{
-	unsigned int pal_size;
-
-	switch (lcd_info->osd.fg0.bpp)
-	{
-	case 1:
-		pal_size = 4;
-		break;
-	case 2:
-		pal_size = 8;
-		break;
-	case 4:
-		pal_size = 32;
-		break;
-	case 8:
-	default:
-		pal_size = 512;
-	}
-
-	pal_size /= 4;
-
-	dma0_desc_palette = dma_desc_base + 0;
-	dma0_desc0 = dma_desc_base + 1;
-	dma0_desc1 = dma_desc_base + 2;
-	dma0_desc_cmd0 = dma_desc_base + 3; /* use only once */
-	dma0_desc_cmd = dma_desc_base + 4;
-	dma1_desc0 = dma_desc_base + 5;
-	dma1_desc1 = dma_desc_base + 6;
-
-	/*
-	 * Normal TFT panel's DMA Chan0:
-	 *	TO LCD Panel:
-	 * 		no palette:	dma0_desc0 <<==>> dma0_desc0
-	 * 		palette :	dma0_desc_palette <<==>> dma0_desc0
-	 *	TO TV Encoder:
-	 * 		no palette:	dma0_desc0 <<==>> dma0_desc1
-	 * 		palette:	dma0_desc_palette --> dma0_desc0
-	 * 				--> dma0_desc1 --> dma0_desc_palette --> ...
-	 *
-	 * SMART LCD TFT panel(dma0_desc_cmd)'s DMA Chan0:
-	 *	TO LCD Panel:
-	 * 		no palette:	dma0_desc_cmd <<==>> dma0_desc0
-	 * 		palette :	dma0_desc_palette --> dma0_desc_cmd
-	 * 				--> dma0_desc0 --> dma0_desc_palette --> ...
-	 *	TO TV Encoder:
-	 * 		no palette:	dma0_desc_cmd --> dma0_desc0
-	 * 				--> dma0_desc1 --> dma0_desc_cmd --> ...
-	 * 		palette:	dma0_desc_palette --> dma0_desc_cmd
-	 * 				--> dma0_desc0 --> dma0_desc1
-	 * 				--> dma0_desc_palette --> ...
-	 * DMA Chan1:
-	 *	TO LCD Panel:
-	 * 		dma1_desc0 <<==>> dma1_desc0
-	 *	TO TV Encoder:
-	 * 		dma1_desc0 <<==>> dma1_desc1
-	 */
-
-#if defined(CONFIG_FB_JZ4760_SLCD)
-	/* First CMD descriptors, use only once, cmd_num isn't 0 */
-	dma0_desc_cmd0->next_desc = (unsigned int)virt_to_phys(dma0_desc0);
-	dma0_desc_cmd0->databuf = (unsigned int)virt_to_phys((void *)lcd_cmdbuf);
-	dma0_desc_cmd0->frame_id = (unsigned int)0x0da0cad0; /* dma0's cmd0 */
-	dma0_desc_cmd0->cmd = LCD_CMD_CMD | 3;				 /* command */
-	dma0_desc_cmd0->offsize = 0;
-	dma0_desc_cmd0->page_width = 0;
-	dma0_desc_cmd0->cmd_num = 3;
-
-	/* Dummy Command Descriptor, cmd_num is 0 */
-	dma0_desc_cmd->next_desc = (unsigned int)virt_to_phys(dma0_desc0);
-	dma0_desc_cmd->databuf = 0;
-	dma0_desc_cmd->frame_id = (unsigned int)0x0da000cd; /* dma0's cmd0 */
-	dma0_desc_cmd->cmd = LCD_CMD_CMD | 0;				/* dummy command */
-	dma0_desc_cmd->cmd_num = 0;
-	dma0_desc_cmd->offsize = 0;
-	dma0_desc_cmd->page_width = 0;
-
-	/* Palette Descriptor */
-	dma0_desc_palette->next_desc = (unsigned int)virt_to_phys(dma0_desc_cmd0);
-#else
-	/* Palette Descriptor */
-	dma0_desc_palette->next_desc = (unsigned int)virt_to_phys(dma0_desc0);
-#endif
-	dma0_desc_palette->databuf = (unsigned int)virt_to_phys((void *)lcd_palette);
-	dma0_desc_palette->frame_id = (unsigned int)0xaaaaaaaa;
-	dma0_desc_palette->cmd = LCD_CMD_PAL | pal_size; /* Palette Descriptor */
-
-	/* DMA0 Descriptor0 */
-	if (lcd_info->panel.cfg & LCD_CFG_TVEN) /* TVE mode */
-		dma0_desc0->next_desc = (unsigned int)virt_to_phys(dma0_desc1);
-	else
-	{ /* Normal TFT LCD */
-#if defined(CONFIG_FB_JZ4760_SLCD)
-		dma0_desc0->next_desc = (unsigned int)virt_to_phys(dma0_desc_cmd);
-#else
-		dma0_desc0->next_desc = (unsigned int)virt_to_phys(dma0_desc0);
-#endif
-	}
-
-	dma0_desc0->databuf = virt_to_phys((void *)lcd_frame0);
-	dma0_desc0->frame_id = (unsigned int)0x0000da00; /* DMA0'0 */
-
-	/* DMA0 Descriptor1 */
-	if (lcd_info->panel.cfg & LCD_CFG_TVEN)
-	{ /* TVE mode */
-
-		if (lcd_info->osd.fg0.bpp <= 8) /* load palette only once at setup */
-			dma0_desc1->next_desc = (unsigned int)virt_to_phys(dma0_desc_palette);
-		else
-#if defined(CONFIG_FB_JZ4760_SLCD) /* for smatlcd */
-			dma0_desc1->next_desc = (unsigned int)virt_to_phys(dma0_desc_cmd);
-#else
-			dma0_desc1->next_desc = (unsigned int)virt_to_phys(dma0_desc0);
-#endif
-		dma0_desc1->frame_id = (unsigned int)0x0000da01; /* DMA0'1 */
-	}
-
-	if (lcd_info->osd.fg0.bpp <= 8) /* load palette only once at setup */
-		REG_LCD_DA0 = virt_to_phys(dma0_desc_palette);
-	else
-	{
-#if defined(CONFIG_FB_JZ4760_SLCD)					/* for smartlcd */
-		REG_LCD_DA0 = virt_to_phys(dma0_desc_cmd0); //smart lcd
-#else
-		REG_LCD_DA0 = virt_to_phys(dma0_desc0); //tft
-#endif
-	}
-
-	/* DMA1 Descriptor0 */
-	if (lcd_info->panel.cfg & LCD_CFG_TVEN) /* TVE mode */
-		dma1_desc0->next_desc = (unsigned int)virt_to_phys(dma1_desc1);
-	else /* Normal TFT LCD */
-		dma1_desc0->next_desc = (unsigned int)virt_to_phys(dma1_desc0);
-
-	dma1_desc0->databuf = virt_to_phys((void *)lcd_frame1);
-	dma1_desc0->frame_id = (unsigned int)0x0000da10; /* DMA1'0 */
-
-	/* DMA1 Descriptor1 */
-	if (lcd_info->panel.cfg & LCD_CFG_TVEN)
-	{ /* TVE mode */
-		dma1_desc1->next_desc = (unsigned int)virt_to_phys(dma1_desc0);
-		dma1_desc1->frame_id = (unsigned int)0x0000da11; /* DMA1'1 */
-	}
-
-	REG_LCD_DA1 = virt_to_phys(dma1_desc0); /* set Dma-chan1's Descripter Addrress */
-	dma_cache_wback_inv((unsigned int)(dma_desc_base), (DMA_DESC_NUM) * sizeof(struct jz4760_lcd_dma_desc));
-
-#if 0
-	/* Palette Descriptor */
-	if ( lcd_info->panel.cfg & LCD_CFG_LCDPIN_SLCD )
-//		dma0_desc_palette->next_desc = (unsigned int)virt_to_phys(dma0_desc_cmd);
-		dma0_desc_palette->next_desc = (unsigned int)virt_to_phys(dma0_desc_cmd1);
-	else
-		dma0_desc_palette->next_desc = (unsigned int)virt_to_phys(dma0_desc0);
-	dma0_desc_palette->databuf = (unsigned int)virt_to_phys((void *)lcd_palette);
-	dma0_desc_palette->frame_id = (unsigned int)0xaaaaaaaa;
-	dma0_desc_palette->cmd 	= LCD_CMD_PAL | pal_size; /* Palette Descriptor */
-
-	/* Dummy Command Descriptor, cmd_num is 0 */
-	dma0_desc_cmd->next_desc = (unsigned int)virt_to_phys(dma0_desc0);
-	dma0_desc_cmd->databuf 	= (unsigned int)virt_to_phys((void *)lcd_cmdbuf);
-	dma0_desc_cmd->frame_id = (unsigned int)0x0da0cad0; /* dma0's cmd0 */
-	dma0_desc_cmd->cmd 	= LCD_CMD_CMD | 3; /* dummy command */
-	dma0_desc_cmd->offsize 	= 0; /* dummy command */
-	dma0_desc_cmd->page_width = 0; /* dummy command */
-	dma0_desc_cmd->cmd_num 	= 3;
-
-//---------------------------------
-	dma0_desc_cmd1->next_desc = (unsigned int)virt_to_phys(dma0_desc0);
-	dma0_desc_cmd1->databuf 	= 0;
-	dma0_desc_cmd1->frame_id = (unsigned int)0x0da0cad1; /* dma0's cmd0 */
-	dma0_desc_cmd1->cmd 	= LCD_CMD_CMD | 0; /* dummy command */
-	dma0_desc_cmd1->cmd_num 	= 0;
-	dma0_desc_cmd1->offsize 	= 0; /* dummy command */
-	dma0_desc_cmd1->page_width = 0; /* dummy command */
-//-----------------------------------
-	/* DMA0 Descriptor0 */
-	if ( lcd_info->panel.cfg & LCD_CFG_TVEN ) /* TVE mode */
-		dma0_desc0->next_desc = (unsigned int)virt_to_phys(dma0_desc1);
-	else{			/* Normal TFT LCD */
-		if (lcd_info->osd.fg0.bpp <= 8) /* load palette only once at setup?? */
-//			dma0_desc0->next_desc = (unsigned int)virt_to_phys(dma0_desc_palette); //tft
-			dma0_desc0->next_desc = (unsigned int)virt_to_phys(dma0_desc_cmd); // smart lcd
-		else if ( lcd_info->panel.cfg & LCD_CFG_LCDPIN_SLCD )
-			dma0_desc0->next_desc = (unsigned int)virt_to_phys(dma0_desc_cmd1);
-//			dma0_desc0->next_desc = (unsigned int)virt_to_phys(dma0_desc_cmd);
-		else
-			dma0_desc0->next_desc = (unsigned int)virt_to_phys(dma0_desc0);
-	}
-
-	dma0_desc0->databuf = virt_to_phys((void *)lcd_frame0);
-	dma0_desc0->frame_id = (unsigned int)0x0000da00; /* DMA0'0 */
-
-	/* DMA0 Descriptor1 */
-	if ( lcd_info->panel.cfg & LCD_CFG_TVEN ) { /* TVE mode */
-		if (lcd_info->osd.fg0.bpp <= 8) /* load palette only once at setup?? */
-			dma0_desc1->next_desc = (unsigned int)virt_to_phys(dma0_desc_palette);
-
-		else if ( lcd_info->panel.cfg & LCD_CFG_LCDPIN_SLCD )
-			dma0_desc1->next_desc = (unsigned int)virt_to_phys(dma0_desc_cmd);
-		else
-			dma0_desc1->next_desc = (unsigned int)virt_to_phys(dma0_desc0);
-		dma0_desc1->frame_id = (unsigned int)0x0000da01; /* DMA0'1 */
-	}
-
-	/* DMA1 Descriptor0 */
-	if ( lcd_info->panel.cfg & LCD_CFG_TVEN ) /* TVE mode */
-		dma1_desc0->next_desc = (unsigned int)virt_to_phys(dma1_desc1);
-	else			/* Normal TFT LCD */
-		dma1_desc0->next_desc = (unsigned int)virt_to_phys(dma1_desc0);
-
-	dma1_desc0->databuf = virt_to_phys((void *)lcd_frame1);
-	dma1_desc0->frame_id = (unsigned int)0x0000da10; /* DMA1'0 */
-
-	/* DMA1 Descriptor1 */
-	if ( lcd_info->panel.cfg & LCD_CFG_TVEN ) { /* TVE mode */
-		dma1_desc1->next_desc = (unsigned int)virt_to_phys(dma1_desc0);
-		dma1_desc1->frame_id = (unsigned int)0x0000da11; /* DMA1'1 */
-	}
-
-	if (lcd_info->osd.fg0.bpp <= 8) /* load palette only once at setup?? */
-		REG_LCD_DA0 = virt_to_phys(dma0_desc_palette);
-	else
-//		REG_LCD_DA0 = virt_to_phys(dma0_desc_cmd); //smart lcd
-		REG_LCD_DA0 = virt_to_phys(dma0_desc0); //tft
-	REG_LCD_DA1 = virt_to_phys(dma1_desc0);	/* set Dma-chan1's Descripter Addrress */
-	dma_cache_wback_inv((unsigned int)(dma_desc_base), (DMA_DESC_NUM)*sizeof(struct jz4760_lcd_dma_desc));
-#endif
-}
 
 static void jz4760fb_set_panel_mode(struct jz4760lcd_info *lcd_info)
 {
@@ -2104,18 +1844,6 @@ static void jz4760fb_foreground_resize(struct jz4760lcd_info *lcd_info)
 	if (lcd_info->osd.fg0.y + lcd_info->osd.fg0.h > lcd_info->panel.h)
 		lcd_info->osd.fg0.h = lcd_info->panel.h - lcd_info->osd.fg0.y;
 
-#if 0
-	/* Foreground 1 */
-	/* Case TVE ??? TVE 720x573 or 720x480*/
-	if ( lcd_info->osd.fg1.x >= lcd_info->panel.w )
-		lcd_info->osd.fg1.x = lcd_info->panel.w;
-	if ( lcd_info->osd.fg1.y >= lcd_info->panel.h )
-		lcd_info->osd.fg1.y = lcd_info->panel.h;
-	if ( lcd_info->osd.fg1.x + lcd_info->osd.fg1.w > lcd_info->panel.w )
-		lcd_info->osd.fg1.w = lcd_info->panel.w - lcd_info->osd.fg1.x;
-	if ( lcd_info->osd.fg1.y + lcd_info->osd.fg1.h > lcd_info->panel.h )
-		lcd_info->osd.fg1.h = lcd_info->panel.h - lcd_info->osd.fg1.y;
-#endif
 	//	fg0_line_size = lcd_info->osd.fg0.w*((lcd_info->osd.fg0.bpp+7)/8);
 	fg0_line_size = (lcd_info->osd.fg0.w * (lcd_info->osd.fg0.bpp) / 8);
 	fg0_line_size = ((fg0_line_size + 3) >> 2) << 2; /* word aligned */
@@ -2147,47 +1875,14 @@ static void jz4760fb_foreground_resize(struct jz4760lcd_info *lcd_info)
 
 		if (lcd_info->osd.fg_change & FG0_CHANGE_SIZE)
 		{ /* change FG0 size */
-			if (lcd_info->panel.cfg & LCD_CFG_TVEN)
-			{ /* output to TV */
-				dma0_desc0->cmd = dma0_desc1->cmd = (fg0_frm_size / 4) / 2;
-				dma0_desc0->offsize = dma0_desc1->offsize = fg0_line_size / 4;
-				dma0_desc0->page_width = dma0_desc1->page_width = fg0_line_size / 4;
-				dma0_desc1->databuf = virt_to_phys((void *)(lcd_frame0 + fg0_line_size));
-				REG_LCD_DA0 = virt_to_phys(dma0_desc0); //tft
-			}
-			else
-			{
-				dma0_desc0->cmd = dma0_desc1->cmd = fg0_frm_size / 4;
-				dma0_desc0->offsize = dma0_desc1->offsize = 0;
-				dma0_desc0->page_width = dma0_desc1->page_width = 0;
-			}
-
-			dma0_desc0->desc_size = dma0_desc1->desc_size = lcd_info->osd.fg0.h << 16 | lcd_info->osd.fg0.w;
 			REG_LCD_SIZE0 = (lcd_info->osd.fg0.h << 16) | lcd_info->osd.fg0.w;
 		}
 
 		if (lcd_info->osd.fg_change & FG1_CHANGE_SIZE)
 		{ /* change FG1 size*/
-			if (lcd_info->panel.cfg & LCD_CFG_TVEN)
-			{ /* output to TV */
-				dma1_desc0->cmd = dma1_desc1->cmd = (fg1_frm_size / 4) / 2;
-				dma1_desc0->offsize = dma1_desc1->offsize = fg1_line_size / 4;
-				dma1_desc0->page_width = dma1_desc1->page_width = fg1_line_size / 4;
-				dma1_desc1->databuf = virt_to_phys((void *)(lcd_frame1 + fg1_line_size));
-				REG_LCD_DA1 = virt_to_phys(dma0_desc1); //tft
-			}
-			else
-			{
-				dma1_desc0->cmd = dma1_desc1->cmd = fg1_frm_size / 4;
-				dma1_desc0->offsize = dma1_desc1->offsize = 0;
-				dma1_desc0->page_width = dma1_desc1->page_width = 0;
-			}
-
-			dma1_desc0->desc_size = dma1_desc1->desc_size = lcd_info->osd.fg1.h << 16 | lcd_info->osd.fg1.w;
 			REG_LCD_SIZE1 = lcd_info->osd.fg1.h << 16 | lcd_info->osd.fg1.w;
 		}
 
-		dma_cache_wback((unsigned int)(dma_desc_base), (DMA_DESC_NUM) * sizeof(struct jz4760_lcd_dma_desc));
 		lcd_info->osd.fg_change = FG_NOCHANGE; /* clear change flag */
 	}
 }
@@ -2327,7 +2022,7 @@ static void jz4760fb_deep_set_mode(struct jz4760lcd_info *lcd_info)
 
 	__lcd_clr_ena();						 /* Quick Disable */
 	lcd_info->osd.fg_change = FG_CHANGE_ALL; /* change FG0, FG1 size, postion??? */
-	jz4760fb_descriptor_init(lcd_info);
+	//jz4760fb_descriptor_init(lcd_info);
 	jz4760fb_set_panel_mode(lcd_info);
 	jz4760fb_set_mode(lcd_info);
 	jz4760fb_change_clock(lcd_info);
