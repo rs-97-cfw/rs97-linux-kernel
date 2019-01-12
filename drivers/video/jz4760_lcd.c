@@ -1318,7 +1318,19 @@ static int jz4760fb_blank(int blank_mode, struct fb_info *info)
 /*
  * pan display
  */
-static int jz4760fb_pan_display(struct fb_var_screeninfo *var, struct fb_info *info)
+  static int jz4760fb_pan_display(struct fb_var_screeninfo *var, struct fb_info *info)
+{
+	struct lcd_cfb_info *cfb = (struct lcd_cfb_info *)info;
+	if (!var || !cfb)
+	{
+		return -EINVAL;
+	}
+	frame_yoffset = var->yoffset * cfb->fb.fix.line_length;
+	ipu_update_address();
+
+	return 0;
+}
+static int jz4760fb_pan_display_vsync(struct fb_var_screeninfo *var, struct fb_info *info)
 {
 	struct lcd_cfb_info *cfb = (struct lcd_cfb_info *)info;
 	if (!var || !cfb)
