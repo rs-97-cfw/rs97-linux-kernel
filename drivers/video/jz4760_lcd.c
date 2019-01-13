@@ -792,6 +792,7 @@ static unsigned char *lcd_palette;
 unsigned char *lcd_frame0, *lcd_frame1;
 
 //TONY IPU
+uint32_t vsync_mode;
 uint32_t vsync_count;
 spinlock_t lock;
 wait_queue_head_t wait_vsync;
@@ -1318,7 +1319,7 @@ static int jz4760fb_blank(int blank_mode, struct fb_info *info)
 /*
  * pan display
  */
-  static int jz4760fb_pan_display(struct fb_var_screeninfo *var, struct fb_info *info)
+  static int jz4760fb_pan_display_b(struct fb_var_screeninfo *var, struct fb_info *info)
 {
 	struct lcd_cfb_info *cfb = (struct lcd_cfb_info *)info;
 	if (!var || !cfb)
@@ -1330,22 +1331,54 @@ static int jz4760fb_blank(int blank_mode, struct fb_info *info)
 
 	return 0;
 }
-static int jz4760fb_pan_display_vsync(struct fb_var_screeninfo *var, struct fb_info *info)
+static int jz4760fb_pan_display(struct fb_var_screeninfo *var, struct fb_info *info)
 {
 	struct lcd_cfb_info *cfb = (struct lcd_cfb_info *)info;
 	if (!var || !cfb)
 	{
 		return -EINVAL;
 	}
-	spin_lock_irq(&lock);
+	switch (vsync_mode)
+	{
+		case 0: //Hybird
+			if (delay_flush > 0)
+			{
+				spin_lock_irq(&lock);
+				frame_yoffset = var->yoffset * cfb->fb.fix.line_length;
+				delay_flush = 32;
+				dma_cache_wback_inv((unsigned long)(lcd_frame0 + frame_yoffset),
+							cfb->fb.fix.line_length * cfb->fb.var.yres);
+				spin_unlock_irq(&lock);
+				jzfb_wait_for_vsync();
+			}
+			else
+			{
+				frame_yoffset = var->yoffset * cfb->fb.fix.line_length;
+				delay_flush = 32;
+				dma_cache_wback_inv((unsigned long)(lcd_frame0 + frame_yoffset),
+							cfb->fb.fix.line_length * cfb->fb.var.yres);
+				ipu_update_address();
+			}
+			break;
+			case 1: //force on
+							spin_lock_irq(&lock);
+				frame_yoffset = var->yoffset * cfb->fb.fix.line_length;
+				delay_flush = 32;
+				dma_cache_wback_inv((unsigned long)(lcd_frame0 + frame_yoffset),
+							cfb->fb.fix.line_length * cfb->fb.var.yres);
+				spin_unlock_irq(&lock);
+				jzfb_wait_for_vsync();
 
-	frame_yoffset = var->yoffset * cfb->fb.fix.line_length;
-	delay_flush = 8;
-	dma_cache_wback_inv((unsigned long)(lcd_frame0 + frame_yoffset),
-				cfb->fb.fix.line_length * cfb->fb.var.yres);
-	spin_unlock_irq(&lock);
-	jzfb_wait_for_vsync();
-
+			break;
+			case 2:
+				frame_yoffset = var->yoffset * cfb->fb.fix.line_length;
+				delay_flush = 32;
+				dma_cache_wback_inv((unsigned long)(lcd_frame0 + frame_yoffset),
+							cfb->fb.fix.line_length * cfb->fb.var.yres);
+				ipu_update_address();
+			break;
+		
+	}
 	return 0;
 }
 
@@ -2610,7 +2643,27 @@ static int proc_lcd_backlight_write_proc(
 	return count;
 }
 
+static int proc_vsync_mode_read_proc(
+	char *page, char **start, off_t off,
+	int count, int *eof, void *data)
+{
+	return sprintf(page, "%lu\n", vsync_mode);
+}
 
+static int proc_vsync_mode_write_proc(
+	struct file *file, const char *buffer,
+	unsigned long count, void *data)
+{
+	int tmp_output_flag;
+
+	tmp_output_flag = simple_strtoul(buffer, 0, 10);
+
+	if (tmp_output_flag != vsync_mode)
+	{
+		vsync_mode = tmp_output_flag;
+	}
+	return count;
+}
 
 static int __devinit jz4760_fb_probe(struct platform_device *dev)
 {
@@ -2632,6 +2685,7 @@ static int __devinit jz4760_fb_probe(struct platform_device *dev)
 	init_waitqueue_head(&wait_vsync);
 	spin_lock_init(&lock);
 	delay_flush = 0;
+	vsync_mode = 0;
 	/* init clk */
 	//jz4760fb_change_clock(jz4760_lcd_info);
 	jz4760fb_device_attr_register(&cfb->fb);
@@ -2767,7 +2821,13 @@ static int __init jz4760_fb_init(void)
 		res->read_proc = proc_lcd_backlight_read_proc;
 		res->write_proc = proc_lcd_backlight_write_proc;
 	}
-
+	res = create_proc_entry("jz/vsync_mode", 0, NULL);
+	if(res)
+	{
+		res->read_proc = proc_vsync_mode_read_proc;
+		res->write_proc = proc_vsync_mode_write_proc;
+		res->data = NULL;
+	}
 	return platform_driver_register(&jz4760_fb_driver);
 }
 
