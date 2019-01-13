@@ -1354,16 +1354,16 @@ static int jz4760fb_pan_display(struct fb_var_screeninfo *var, struct fb_info *i
 			else
 			{
 				frame_yoffset = var->yoffset * cfb->fb.fix.line_length;
-				delay_flush = 32;
+				delay_flush = 8;
 				dma_cache_wback_inv((unsigned long)(lcd_frame0 + frame_yoffset),
 							cfb->fb.fix.line_length * cfb->fb.var.yres);
 				ipu_update_address();
 			}
 			break;
 			case 1: //force on
-							spin_lock_irq(&lock);
+				spin_lock_irq(&lock);
 				frame_yoffset = var->yoffset * cfb->fb.fix.line_length;
-				delay_flush = 32;
+				delay_flush = 8;
 				dma_cache_wback_inv((unsigned long)(lcd_frame0 + frame_yoffset),
 							cfb->fb.fix.line_length * cfb->fb.var.yres);
 				spin_unlock_irq(&lock);
@@ -1372,7 +1372,7 @@ static int jz4760fb_pan_display(struct fb_var_screeninfo *var, struct fb_info *i
 			break;
 			case 2:
 				frame_yoffset = var->yoffset * cfb->fb.fix.line_length;
-				delay_flush = 32;
+				delay_flush = 8;
 				dma_cache_wback_inv((unsigned long)(lcd_frame0 + frame_yoffset),
 							cfb->fb.fix.line_length * cfb->fb.var.yres);
 				ipu_update_address();
