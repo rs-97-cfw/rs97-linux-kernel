@@ -2793,7 +2793,7 @@ static int __init jz4760_fb_init(void)
 		res->read_proc = proc_lcd_backlight_read_proc;
 		res->write_proc = proc_lcd_backlight_write_proc;
 	}
-	res = create_proc_entry("jz/vsync_mode", 0, NULL);
+	res = create_proc_entry("jz/vsync", 0, NULL);
 	if(res)
 	{
 		res->read_proc = proc_vsync_mode_read_proc;
