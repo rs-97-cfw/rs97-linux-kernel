@@ -853,7 +853,6 @@ do { \
 	__gpio_clear_pin(SPCK);\
 	__gpio_clear_pin(SPDA);\
 	__gpio_clear_pin(SPEN);\
-	udelay(50);\
 	for(no=0;no<16;no++)\
 	{\
 		__gpio_clear_pin(SPCK);\
@@ -861,13 +860,10 @@ do { \
 			__gpio_set_pin(SPDA);\
 		else\
 			__gpio_clear_pin(SPDA);\
-		udelay(50);\
 		__gpio_set_pin(SPCK);\
 		value <<= 1; \
-		udelay(50);\
 	 }\
 	__gpio_set_pin(SPEN);\
-	udelay(50);\
 } while (0)
 
 
@@ -882,7 +878,6 @@ do { \
 	__gpio_clear_pin(SPCK);\
 	__gpio_clear_pin(SPDA);\
 	__gpio_clear_pin(SPEN);\
-	udelay(50);\
 	if(cmd_dat)\
 		value |= 1<<8;     \
 	else \
@@ -894,13 +889,10 @@ do { \
 			__gpio_set_pin(SPDA);\
 		else\
 			__gpio_clear_pin(SPDA);\
-		udelay(50);\
 		__gpio_set_pin(SPCK);\
 		value <<= 1; \
-		udelay(50);\
 	 }\
 	__gpio_set_pin(SPEN);\
-	udelay(50);\
 } while (0)
 
 #define spi_send_cmd(cmd)     __spi_send_value(0,cmd)
@@ -957,7 +949,6 @@ do { \
 	__gpio_clear_pin(SPCK);\
 	__gpio_clear_pin(SPDA);\
 	__gpio_clear_pin(SPEN);\
-	udelay(50);\
 	for(no=0;no<16;no++)\
 	{\
 		__gpio_clear_pin(SPCK);\
@@ -965,13 +956,10 @@ do { \
 			__gpio_set_pin(SPDA);\
 		else\
 			__gpio_clear_pin(SPDA);\
-		udelay(50);\
 		__gpio_set_pin(SPCK);\
 		value <<= 1; \
-		udelay(50);\
 	 }\
 	__gpio_set_pin(SPEN);\
-	udelay(50);\
 } while (0)
 
 
@@ -986,7 +974,6 @@ do { \
 	__gpio_clear_pin(SPCK);\
 	__gpio_clear_pin(SPDA);\
 	__gpio_clear_pin(SPEN);\
-	udelay(50);\
 	if(cmd_dat)\
 		value |= 1<<8;     \
 	else \
@@ -998,13 +985,10 @@ do { \
 			__gpio_set_pin(SPDA);\
 		else\
 			__gpio_clear_pin(SPDA);\
-		udelay(50);\
 		__gpio_set_pin(SPCK);\
 		value <<= 1; \
-		udelay(50);\
 	 }\
 	__gpio_set_pin(SPEN);\
-	udelay(50);\
 } while (0)
 
 #define spi_send_cmd(cmd)     __spi_send_value(0,cmd)
@@ -1094,7 +1078,6 @@ do { \
 	__gpio_clear_pin(SPCK);\
 	__gpio_clear_pin(SPDA);\
 	__gpio_clear_pin(SPEN);\
-	udelay(50);\
 	for(no=0;no<16;no++)\
 	{\
 		__gpio_clear_pin(SPCK);\
@@ -1102,13 +1085,10 @@ do { \
 			__gpio_set_pin(SPDA);\
 		else\
 			__gpio_clear_pin(SPDA);\
-		udelay(50);\
 		__gpio_set_pin(SPCK);\
 		value <<= 1; \
-		udelay(50);\
 	 }\
 	__gpio_set_pin(SPEN);\
-	udelay(50);\
 } while (0)
 
 
@@ -1123,7 +1103,6 @@ do { \
 	__gpio_clear_pin(SPCK);\
 	__gpio_clear_pin(SPDA);\
 	__gpio_clear_pin(SPEN);\
-	udelay(50);\
 	if(cmd_dat)\
 		value |= 1<<8;     \
 	else \
@@ -1135,13 +1114,10 @@ do { \
 			__gpio_set_pin(SPDA);\
 		else\
 			__gpio_clear_pin(SPDA);\
-		udelay(50);\
 		__gpio_set_pin(SPCK);\
 		value <<= 1; \
-		udelay(50);\
 	 }\
 	__gpio_set_pin(SPEN);\
-	udelay(50);\
 } while (0)
 
 #define spi_send_cmd(cmd)     __spi_send_value(0,cmd)
