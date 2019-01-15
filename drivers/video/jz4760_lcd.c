@@ -792,7 +792,7 @@ static unsigned char *lcd_palette;
 unsigned char *lcd_frame0, *lcd_frame1;
 
 //TONY IPU
-uint32_t vsync_mode;
+unsigned long vsync_mode;
 uint32_t vsync_count;
 spinlock_t lock;
 wait_queue_head_t wait_vsync;
@@ -1319,18 +1319,6 @@ static int jz4760fb_blank(int blank_mode, struct fb_info *info)
 /*
  * pan display
  */
-  static int jz4760fb_pan_display_b(struct fb_var_screeninfo *var, struct fb_info *info)
-{
-	struct lcd_cfb_info *cfb = (struct lcd_cfb_info *)info;
-	if (!var || !cfb)
-	{
-		return -EINVAL;
-	}
-	frame_yoffset = var->yoffset * cfb->fb.fix.line_length;
-	ipu_update_address();
-
-	return 0;
-}
 static int jz4760fb_pan_display(struct fb_var_screeninfo *var, struct fb_info *info)
 {
 	struct lcd_cfb_info *cfb = (struct lcd_cfb_info *)info;
@@ -2654,13 +2642,14 @@ static int proc_vsync_mode_write_proc(
 	struct file *file, const char *buffer,
 	unsigned long count, void *data)
 {
-	int tmp_output_flag;
+	unsigned long tmp_output_flag;
 
 	tmp_output_flag = simple_strtoul(buffer, 0, 10);
 
-	if (tmp_output_flag != vsync_mode)
+	if (tmp_output_flag < 3)
 	{
 		vsync_mode = tmp_output_flag;
+		delay_flush = 0;
 	}
 	return count;
 }
@@ -2821,7 +2810,7 @@ static int __init jz4760_fb_init(void)
 		res->read_proc = proc_lcd_backlight_read_proc;
 		res->write_proc = proc_lcd_backlight_write_proc;
 	}
-	res = create_proc_entry("jz/vsync_mode", 0, NULL);
+	res = create_proc_entry("jz/vsync", 0, NULL);
 	if(res)
 	{
 		res->read_proc = proc_vsync_mode_read_proc;
