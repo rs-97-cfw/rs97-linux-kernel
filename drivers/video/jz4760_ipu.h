@@ -280,8 +280,8 @@ typedef struct
 	unsigned int		in_width;
 	unsigned int		in_height;
 	unsigned int		in_bpp;
-	unsigned int		out_x;
-	unsigned int		out_y;
+	// unsigned int		out_x;
+	// unsigned int		out_y;
 //	unsigned int		in_fmt;
 //	unsigned int		out_fmt;
 	unsigned int		out_width;
@@ -289,11 +289,11 @@ typedef struct
 	unsigned char*		y_buf;
 	unsigned char*		u_buf;
 	unsigned char*		v_buf;
-	unsigned char*		out_buf;
+	// unsigned char*		out_buf;
 	unsigned char*		y_t_addr;				// table address
 	unsigned char*		u_t_addr;
 	unsigned char*		v_t_addr;
-	unsigned char*		out_t_addr;
+	// unsigned char*		out_t_addr;
 	struct Ration2m*	ratio_table;
 	struct YuvCsc*		csc;
 	struct YuvStride*	stride;

@@ -789,9 +789,10 @@ static struct lcd_cfb_info *jz4760fb_info;
 
 
 static unsigned char *lcd_palette;
-unsigned char *lcd_frame0, *lcd_frame1;
+unsigned char *lcd_frame0;
 
 //TONY IPU
+bool clear_fb;
 uint32_t vsync_on;
 uint32_t vsync_count;
 spinlock_t lock;
@@ -1258,9 +1259,10 @@ static int jz4760fb_mmap(struct fb_info *info, struct vm_area_struct *vma)
 
 /* checks var and eventually tweaks it to something supported,
  * DO NOT MODIFY PAR */
-static int jz4760fb_check_var(struct fb_var_screeninfo *var, struct fb_info *info)
+static int jz4760fb_check_var(struct fb_var_screeninfo *var, struct fb_info *fb)
 {
-	printk("jz4760fb_check_var, not implement\n");
+	clear_fb = var->bits_per_pixel != fb->var.bits_per_pixel ||
+		var->xres != fb->var.xres || var->yres != fb->var.yres;
 	return 0;
 }
 
@@ -1278,8 +1280,59 @@ static int jzfb_wait_for_vsync()
  * set the video mode according to info->var
  */
 static int jz4760fb_set_par(struct fb_info *info)
-{
-	printk("jz4760fb_set_par, not implemented\n");
+{	
+	struct fb_var_screeninfo *var = &info->var;
+	struct fb_fix_screeninfo *fix = &info->fix;
+	
+	uint32_t xoffset = (320 - (var->xres))/2;
+	uint32_t yoffset = var->yres > 240 ? 480 - (var->yres) : 240 - (var->yres);
+	uint32_t result = yoffset << 16 | xoffset;
+
+	spin_lock_irq(&lock);
+	//struct lcd_cfb_info *jzfb = info->par;
+	fix->line_length = var->xres_virtual * (var->bits_per_pixel >> 3);
+		
+	ipu_driver_close_tv();
+	// printk("TONY RESULT = %d %d %d\n",xoffset,yoffset,result);
+	if (var->yres > 240)
+	{
+		REG_LCD_XYP1 = 0;	
+		REG_LCD_OSDCTRL |= LCD_OSDCTRL_CHANGES;
+		while (REG_LCD_OSDS & LCD_OSDS_READY != 1);
+		
+		REG_LCD_SIZE1 = var->yres << 16 | var->xres;
+		REG_LCD_OSDCTRL |= LCD_OSDCTRL_CHANGES;
+		while (REG_LCD_OSDS & LCD_OSDS_READY != 1);
+		
+		ipu_driver_open_tv(var->xres,var->yres,var->xres,var->yres);		
+	}
+	else
+	{
+		REG_LCD_XYP1 = result;	
+		REG_LCD_OSDCTRL |= LCD_OSDCTRL_CHANGES;
+		while (REG_LCD_OSDS & LCD_OSDS_READY != 1);
+
+		REG_LCD_SIZE1 = var->yres*2 << 16 | var->xres;
+		REG_LCD_OSDCTRL |= LCD_OSDCTRL_CHANGES;
+		while (REG_LCD_OSDS & LCD_OSDS_READY != 1);
+		
+		ipu_driver_open_tv(var->xres,var->yres,var->xres,var->yres * 2);
+	}
+	
+	if (clear_fb) 
+	{
+		void *page_virt = lcd_frame0;
+		unsigned int size = fix->line_length * var->yres * 3;
+
+		spin_unlock_irq(&lock);
+
+		for (; page_virt < lcd_frame0 + size; page_virt += PAGE_SIZE)
+			clear_page(page_virt);
+		dma_cache_wback_inv((unsigned long) lcd_frame0, size);
+
+		spin_lock_irq(&lock);
+	}
+	
 	return 0;
 }
 
@@ -1319,18 +1372,6 @@ static int jz4760fb_blank(int blank_mode, struct fb_info *info)
 /*
  * pan display
  */
-  static int jz4760fb_pan_display_b(struct fb_var_screeninfo *var, struct fb_info *info)
-{
-	struct lcd_cfb_info *cfb = (struct lcd_cfb_info *)info;
-	if (!var || !cfb)
-	{
-		return -EINVAL;
-	}
-	frame_yoffset = var->yoffset * cfb->fb.fix.line_length;
-	ipu_update_address();
-
-	return 0;
-}
 static int jz4760fb_pan_display(struct fb_var_screeninfo *var, struct fb_info *info)
 {
 	struct lcd_cfb_info *cfb = (struct lcd_cfb_info *)info;
@@ -2023,7 +2064,7 @@ static void jz4760fb_set_mode(struct jz4760lcd_info *lcd_info)
 	struct lcd_cfb_info *cfb = jz4760fb_info;
 
 	jz4760fb_set_osd_mode(lcd_info);
-	jz4760fb_foreground_resize(lcd_info);
+	//jz4760fb_foreground_resize(lcd_info);
 	jz4760fb_set_var(&cfb->fb.var, -1, &cfb->fb);
 }
 
