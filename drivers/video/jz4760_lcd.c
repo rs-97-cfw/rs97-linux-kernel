@@ -793,7 +793,9 @@ unsigned char *lcd_frame0;
 
 //TONY IPU
 bool clear_fb;
+#ifdef VSYNC_OPTION
 uint32_t vsync_on;
+#endif
 uint32_t vsync_count;
 spinlock_t lock;
 wait_queue_head_t wait_vsync;
@@ -1379,7 +1381,9 @@ static int jz4760fb_pan_display(struct fb_var_screeninfo *var, struct fb_info *i
 	{
 		return -EINVAL;
 	}
+#ifdef VSYNC_OPTION
 	if (vsync_on)
+#endif
 	{
 		spin_lock_irq(&lock);
 		frame_yoffset = var->yoffset * cfb->fb.fix.line_length;
@@ -1389,6 +1393,7 @@ static int jz4760fb_pan_display(struct fb_var_screeninfo *var, struct fb_info *i
 		spin_unlock_irq(&lock);
 		jzfb_wait_for_vsync();
 	}
+#ifdef VSYNC_OPTION
 	else
 	{
 		frame_yoffset = var->yoffset * cfb->fb.fix.line_length;
@@ -1397,6 +1402,7 @@ static int jz4760fb_pan_display(struct fb_var_screeninfo *var, struct fb_info *i
 					cfb->fb.fix.line_length * cfb->fb.var.yres);
 		ipu_update_address();
 	}
+#endif
 	return 0;
 }
 
@@ -2660,7 +2666,7 @@ static int proc_lcd_backlight_write_proc(
 	}
 	return count;
 }
-
+#ifdef VSYNC_OPTION
 static int proc_vsync_mode_read_proc(
 	char *page, char **start, off_t off,
 	int count, int *eof, void *data)
@@ -2677,7 +2683,7 @@ static int proc_vsync_mode_write_proc(
 	;
 	return count;
 }
-
+#endif
 static int __devinit jz4760_fb_probe(struct platform_device *dev)
 {
 	struct lcd_cfb_info *cfb;
@@ -2698,7 +2704,9 @@ static int __devinit jz4760_fb_probe(struct platform_device *dev)
 	init_waitqueue_head(&wait_vsync);
 	spin_lock_init(&lock);
 	delay_flush = 0;
+#ifdef VSYNC_OPTION	
 	vsync_on = 1;
+#endif
 	/* init clk */
 	//jz4760fb_change_clock(jz4760_lcd_info);
 	jz4760fb_device_attr_register(&cfb->fb);
@@ -2834,6 +2842,8 @@ static int __init jz4760_fb_init(void)
 		res->read_proc = proc_lcd_backlight_read_proc;
 		res->write_proc = proc_lcd_backlight_write_proc;
 	}
+#ifdef VSYNC_OPTION
+	
 	res = create_proc_entry("jz/vsync", 0, NULL);
 	if(res)
 	{
@@ -2841,6 +2851,7 @@ static int __init jz4760_fb_init(void)
 		res->write_proc = proc_vsync_mode_write_proc;
 		res->data = NULL;
 	}
+#endif	
 	return platform_driver_register(&jz4760_fb_driver);
 }
 
