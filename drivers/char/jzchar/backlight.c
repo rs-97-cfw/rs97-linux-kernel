@@ -91,8 +91,10 @@ static int backlight_control_thread(void *unused)
 			if (backlightButton == BTN_PRESSED)
 			{
 				backlight_value += 20;
-				if (backlight_value > 100)
+				if (backlight_value >= 120)
 					backlight_value = 5;
+				else if (backlight_value > 100)
+					backlight_value = 100;
 				__lcd_set_backlight_level(backlight_value);
 			}
 		}
