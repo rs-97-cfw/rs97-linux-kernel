@@ -67,7 +67,7 @@ MODULE_LICENSE("GPL");
 
 
 #define POWEROFF_PERIOD         1000    /* unit: ms */
-#define POWEROFF_DELAY          500     /* unit: ms */
+#define POWEROFF_DELAY          10     /* unit: ms */
 //KJH ADD 
 static struct task_struct *poweroff_task;
 static struct timer_list poweroff_timer;
@@ -75,6 +75,7 @@ static struct timer_list poweroff_delaytimer;
 static struct timer_list poweroff_checktimer;
 static struct work_struct suspend_work;
 
+static int tony_flag = 0;
 static int poweroff_flag = 0; 
 static int suspend_flag = 0;
 static int num_seconds = 0;
@@ -164,42 +165,36 @@ static void poweroff_timer_check(unsigned long dummy)
 static void poweroff_delaytimer_routine(unsigned long dummy)
 {
 	__gpio_as_input(POWEROFF_PIN);
-	if (__gpio_get_pin(POWEROFF_PIN)==POWEROFF_PIN_DOWN) {
-		if (suspend_flag) {
-			suspend_flag = 0;
-			del_timer(&poweroff_delaytimer);
-			SET_POWEROFF_PIN_AS_IRQ;
-			__gpio_unmask_irq(POWEROFF_PIN);
-			printk("\n--- 1 ---\n");
-			return;
-		}
-		//maddrone add
-		printk("\n--- 2 ---\n");
-		//wake_up_process(poweroff_task);
-		//run_sbin_poweroff();
+	del_timer(&poweroff_delaytimer);
+	if (__gpio_get_pin(POWEROFF_PIN)==POWEROFF_PIN_DOWN) 
+	{
+		init_timer(&poweroff_delaytimer);
+		poweroff_delaytimer.expires = jiffies + POWEROFF_DELAY;
+		poweroff_delaytimer.data = 0;
+		poweroff_delaytimer.function = poweroff_delaytimer_routine;
+		add_timer(&poweroff_delaytimer);
+		tony_flag+=1;
+		//printk("tony_flag = %d\n",tony_flag);
+	}
+	else 
+	{
+		tony_flag = 0;		
+		SET_POWEROFF_PIN_AS_IRQ;
+		__gpio_unmask_irq(POWEROFF_PIN);
+	}
+	
+	if (tony_flag >= 50)
+	{
+		tony_flag = 0;
+
+		//printk("\n--- 2 ---\n");
 		init_timer(&poweroff_checktimer);
 		poweroff_checktimer.expires = jiffies + POWEROFF_PERIOD/100;
 		poweroff_checktimer.data = 0;
 		poweroff_checktimer.function = poweroff_timer_check;
 		add_timer(&poweroff_checktimer);
-#if 0
-		del_timer(&poweroff_delaytimer);
-		del_timer(&poweroff_timer);
-		init_timer(&poweroff_timer);
-		poweroff_timer.expires = jiffies + POWEROFF_PERIOD/100;
-		poweroff_timer.data = 0;
-		poweroff_timer.function = poweroff_timer_routine;
-		add_timer(&poweroff_timer);
-#endif
 	}
-	else {
 
-		del_timer(&poweroff_delaytimer);
-		SET_POWEROFF_PIN_AS_IRQ;
-		__gpio_unmask_irq(POWEROFF_PIN);
-
-		printk("This is a dummy key\n");
-	}
 }
 
 /*
@@ -226,6 +221,7 @@ static irqreturn_t poweroff_irq(int irq, void *dev_id)
 		add_timer(&poweroff_delaytimer);
 	}
 	else {               
+		printk("power off pin is NOT low!\n");
 
 /* 
  * If it reaches here without jz_udc_active == 0, then it indicates POWEROFF_PIN was
