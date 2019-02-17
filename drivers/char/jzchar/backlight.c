@@ -44,7 +44,7 @@ typedef enum
 
 int backlightButton = BTN_NONE;
 extern unsigned backlight_value;
-long disable = 0;
+bool enable = true;
 
 static void process_button(int* button,uint gpio_pin, bool onStatus)
 {
@@ -85,14 +85,16 @@ static int backlight_control_thread(void *unused)
 {
 	while(1)
 	{
-		if (!disable)
+		if (enable)
 		{
 			process_button(&backlightButton,UMIDO_KEY_LED, 0);
 			if (backlightButton == BTN_PRESSED)
 			{
 				backlight_value += 20;
-				if (backlight_value > 100)
+				if (backlight_value >= 120)
 					backlight_value = 5;
+				else if (backlight_value > 100)
+					backlight_value = 100;
 				__lcd_set_backlight_level(backlight_value);
 			}
 		}
@@ -105,15 +107,15 @@ static int proc_backlight_control_read_proc(
 			char *page, char **start, off_t off,
 			int count, int *eof, void *data)
 {
-	return sprintf(page, "%u\n", disable);
+	return sprintf(page, "%u\n", enable);
 }
 
 static int proc_backlight_control_write_proc(
 		struct file *file, const char *buffer,
 		unsigned long count, void *data)
 {
-	disable =  simple_strtol(buffer, 0, 10);
-	printk("%d\n",disable);
+	enable =  !!simple_strtol(buffer, 0, 10);
+	printk("%d\n",enable);
 	return count;
 }
 static struct task_struct *backlight_control_task;
