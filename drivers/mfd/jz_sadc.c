@@ -199,7 +199,7 @@ static int proc_sadc_battery_show(struct seq_file *m, void *v)
 		else
 			battery_mv_usb = mv;
 #ifndef CHARGE_DET
-		if(mv > 3950)
+		if(mv > BAT_FULL_VALUE)
 			mv = BAT_FULL_VALUE;
 #endif
 
