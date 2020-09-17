@@ -181,7 +181,13 @@ static inline void *mmc_priv(struct mmc_host *host)
 #define mmc_hostname(x)	(dev_name(&(x)->class_dev))
 
 extern int mmc_suspend_host(struct mmc_host *, pm_message_t);
+#ifdef CONFIG_PM
 extern int mmc_resume_host(struct mmc_host *);
+#else
+static inline int mmc_resume_host(struct mmc_host *n) {
+	return 0;
+}
+#endif
 
 extern void mmc_detect_change(struct mmc_host *, unsigned long delay);
 extern void mmc_request_done(struct mmc_host *, struct mmc_request *);

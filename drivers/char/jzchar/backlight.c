@@ -39,11 +39,12 @@ typedef enum
 	BTN_NONE = 0,
 	BTN_PRESSED,
 	BTN_HELD,
-	BTN_RELEASED,	
+	BTN_RELEASED,
 }buttonStatus;
 
 int backlightButton = BTN_NONE;
-extern unsigned backlight_value;
+// extern unsigned backlight_value;
+unsigned backlight_value = 80;
 bool enable = true;
 
 static void process_button(int* button,uint gpio_pin, bool onStatus)
@@ -75,8 +76,8 @@ static void process_button(int* button,uint gpio_pin, bool onStatus)
 				case BTN_PRESSED:
 				case BTN_HELD:
 					backlightButton = BTN_RELEASED;
-					break;					
-			}			
+					break;
+			}
 		}
 
 }
@@ -114,8 +115,7 @@ static int proc_backlight_control_write_proc(
 		struct file *file, const char *buffer,
 		unsigned long count, void *data)
 {
-	enable =  !!simple_strtol(buffer, 0, 10);
-	printk("%d\n",enable);
+	enable = !!simple_strtol(buffer, 0, 10);
 	return count;
 }
 static struct task_struct *backlight_control_task;
@@ -133,13 +133,13 @@ static int __init backlight_control_init(void)
 	if(res)
 	{
 		res->read_proc = proc_backlight_control_read_proc;
-		res->write_proc = proc_backlight_control_write_proc;	
+		res->write_proc = proc_backlight_control_write_proc;
 		res->data = NULL;
 	}
 
 	return 0;
 }
- 
+
 static void __exit backlight_control_exit(void)
 {
 }

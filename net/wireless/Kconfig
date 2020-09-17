@@ -89,3 +89,10 @@ config LIB80211_DEBUG
 	  from lib80211.
 
 	  If unsure, say N.
+
+config RTL8192CU
+	tristate "Realtek 8192C USB WiFi"
+	depends on USB
+	---help---
+	  Help message of RTL8192CU
+

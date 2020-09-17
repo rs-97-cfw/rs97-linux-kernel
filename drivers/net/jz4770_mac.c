@@ -1985,6 +1985,8 @@ static struct platform_driver jz4770_mac_driver = {
 
 static int __init jz4770_mac_init(void)
 {
+//	__gpio_as_output1(BUS_RJ45_PWR_EN); //allen add
+	
 #ifndef CONFIG_MDIO_GPIO
 	int ret;
 	ret = platform_driver_register(&jz4770_mii_bus_driver);

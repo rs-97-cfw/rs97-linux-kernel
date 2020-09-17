@@ -13,7 +13,7 @@
  */
 
 /*
-NOTE: The OOB size is align with 4 bytes now. 
+NOTE: The OOB size is align with 4 bytes now.
 If your nand's OOB size not align with 4,and all of the data in OOB area is valid,
 please FIXUP the value of desc->dcnt when init the write/read dma descs, in jz4760b_nand_dma_init func.
 <hpyang@ingenic.cn> 2011/04/02
@@ -125,7 +125,7 @@ enum {
 enum {
 	BCH_NONE,
 	BCH_ENC,
-	BCH_DEC	
+	BCH_DEC
 };
 static volatile u8 nand_status;
 static volatile u8 bch_status;
@@ -157,7 +157,7 @@ DECLARE_WAIT_QUEUE_HEAD(nand_read_wait_queue);
 struct buf_be_corrected {
 	u8 *data;
 	u8 *oob;
-	u8 eccsize; 
+	u8 eccsize;
 };
 
 static u32 addr_offset;
@@ -179,23 +179,23 @@ extern char all_use_planes;
 #if defined(CONFIG_JZ4760_CYGNUS) || defined(CONFIG_JZ4760_LEPUS) || defined(CONFIG_JZ4760B_CYGNUS) || defined(CONFIG_JZ4760B_LEPUS) || defined(CONFIG_JZ4760_HTB80)
 static struct mtd_partition partition_info[] = {
 	{name:"NAND BOOT partition",
-rl_offset:0 * 0x100000LL,
+	  rl_offset:0 * 0x100000LL,
 	  rl_size:4 * 0x100000LL,
 	  use_planes: 0},
 	{name:"NAND KERNEL partition",
-rl_offset:4 * 0x100000LL,
+	  rl_offset:4 * 0x100000LL,
 	  rl_size:4 * 0x100000LL,
 	  use_planes: 0},
 	{name:"NAND ROOTFS partition",
-rl_offset:8 * 0x100000LL,
+	  rl_offset:8 * 0x100000LL,
 	  rl_size:504 * 0x100000LL,
 	  use_planes: 0},
 	{name:"NAND DATA partition",
-rl_offset:512 * 0x100000LL,
+	  rl_offset:512 * 0x100000LL,
 	  rl_size:512 * 0x100000LL,
 	  use_planes: 1},
 	{name:"NAND VFAT partition",
-rl_offset:1024 * 0x100000LL,
+	  rl_offset:1024 * 0x100000LL,
 	  rl_size:1024 * 0x100000LL,
 	  use_planes: 1},
 };
@@ -321,12 +321,12 @@ static void calc_partition_size(struct mtd_info *mtd)
 	struct nand_chip *this = mtd->priv;
 	total_partitions = sizeof(partition_info) / sizeof(struct mtd_partition);
 	for(count = 0; count < total_partitions; count++){ //For the partition which accessed by driver must use -o mode
-		partition_info[count].size = partition_info[count].rl_size 
+		partition_info[count].size = partition_info[count].rl_size
 			- (partition_info[count].rl_size >> this->page_shift) * mtd->freesize;
 		partition_info[count].offset = partition_info[count].rl_offset
 			- (partition_info[count].rl_offset >> this->page_shift) * mtd->freesize;
 		if(mtd_mod_by_eb(partition_info[count].size, mtd)){
-			partition_info[count].size -= mtd_mod_by_eb(partition_info[count].size, mtd); 
+			partition_info[count].size -= mtd_mod_by_eb(partition_info[count].size, mtd);
 		}
 	}
 }
@@ -871,7 +871,7 @@ static void nand_write_page_hwecc_bch0(struct mtd_info *mtd, struct nand_chip *c
 
 #if DMA_DEBUG
 	save_dma_regs(bch_dma_chan,bch_dma_regs);
-	save_dma_regs(nand_dma_chan,nand_dma_regs);	
+	save_dma_regs(nand_dma_chan,nand_dma_regs);
 #endif
 
 	/* DMA doorbell set -- start DMA now ... */
@@ -1472,7 +1472,7 @@ static int nand_read_page_hwecc_bch(struct mtd_info *mtd, struct nand_chip *chip
 	int oobsize = mtd->oobsize / chip->planenum;
 	int ecctotal = chip->ecc.total / chip->planenum;
 	struct buf_be_corrected buf_correct0;
-	int data_per_page = mtd->writesize;	
+	int data_per_page = mtd->writesize;
 
 	dprintk("\nchip->planenum:%d eccsteps:%d eccsize:%d eccbytes:%d ecc_pos:%d pagesize:%d oobsize:%d \
 			ecctotal:%d data_per_page:%d\n",chip->planenum,eccsteps,eccsize,eccbytes,ecc_pos,pagesize,oobsize, \

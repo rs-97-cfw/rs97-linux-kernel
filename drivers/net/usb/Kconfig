@@ -128,7 +128,7 @@ config USB_USBNET
 	  module will be called usbnet.
 
 config USB_NET_AX8817X
-	tristate "ASIX AX88xxx Based USB 2.0 Ethernet Adapters"
+	tristate "ASIX AX8817x Based USB 2.0 Ethernet Adapters"
 	depends on USB_USBNET
 	select CRC32
 	help
@@ -168,6 +168,24 @@ config USB_NET_AX88772A
            *ASIX AX88760 USB 2.0 MTT HUB and USB 2.0 to Fast Ethernet Combo Controller
            *ASIX AX88772B USB 2.0 Fast Ethernet Network Adapter
 
+	  This driver creates an interface named "ethX", where X depends on
+	  what other networking devices you have in use.
+
+config USB_NET_AX88772B
+	tristate "ASIX AX88772C_772B_772A_760_772_178 Based USB Ethernet Adapters"
+	depends on USB_USBNET
+	default m
+	help
+	  AX88772C_772B_772A_760_772_178_LINUX_DRIVER_v4.17.3
+	
+ 	  This driver should work with at least the following devices:
+	   *ASIX AX88178 USB 2.0 Gigabit Ethernet Network Adapter
+           *ASIX AX88772 USB 2.0 Fast Ethernet Network Adapter
+           *ASIX AX88772A USB 2.0 Fast Ethernet Network Adapter
+           *ASIX AX88760 USB 2.0 MTT HUB and USB 2.0 to Fast Ethernet Combo Controller
+           *ASIX AX88772B USB 2.0 Fast Ethernet Network Adapter
+		 			 *ASIX AX88772C USB 2.0 Fast Ethernet Network Adapter
+		 
 	  This driver creates an interface named "ethX", where X depends on
 	  what other networking devices you have in use.
 

@@ -120,7 +120,6 @@ static void __init soc_emc_setup(void)
 static void __init soc_dmac_setup(void)
 {
 	__dmac_enable_module(0);
-	__dmac_enable_module(1);
 }
 
 static void __init jz_soc_setup(void)
@@ -156,6 +155,7 @@ static void __init jz_serial_setup(void)
 		printk(KERN_ERR "Serial ttyS1 setup failed!\n");
 	}
 
+#if 0
 	s.line = 2;
 	s.membase = (u8 *)UART2_BASE;
 	s.irq = IRQ_UART2;
@@ -163,14 +163,14 @@ static void __init jz_serial_setup(void)
 	if (early_serial_setup(&s) != 0) {
 		printk(KERN_ERR "Serial ttyS2 setup failed!\n");
 	}
-/*
+
 	s.line = 3;
 	s.membase = (u8 *)UART3_BASE;
 	s.irq = IRQ_UART3;
 	if (early_serial_setup(&s) != 0) {
 		printk(KERN_ERR "Serial ttyS3 setup failed!\n");
 	}
-*/
+#endif
 #endif
 }
 

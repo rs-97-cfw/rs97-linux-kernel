@@ -9,11 +9,10 @@
  *
  */
 
-#ifndef __JZ4760_LCD_H__
-#define __JZ4760_LCD_H__
+#ifndef __JZ4770_LCD_H__
+#define __JZ4770_LCD_H__
 
 //#include <asm/io.h>
-
 
 #define NR_PALETTE	256
 #define PALETTE_SIZE	(NR_PALETTE*2)
@@ -96,222 +95,223 @@ struct jz4760lcd_info {
 #define FBIO_MODE_SWITCH	0x46a5 /* switch mode between LCD and TVE */
 #define FBIO_GET_TVE_MODE	0x46a6 /* get tve info */
 #define FBIO_SET_TVE_MODE	0x46a7 /* set tve mode */
-
+#define FBIO_GET_IPU_RESTART_VALUE 0x46a8
 /*
  * LCD panel specific definition
  */
+
 /* AUO */
-#if defined(CONFIG_JZ4760_LCD_AUO_A043FL01V2)
-#if defined(CONFIG_JZ4770_F4770) 
-	#define SPEN		(32*4+16)       /*LCD_CS*/
-	#define SPCK		(32*4+15)       /*LCD_SCL*/
-	#define SPDA		(32*4+17)       /*LCD_SDA*/
-	#define LCD_RET 	(32*4+2)       /*LCD_DISP_N use for lcd reset*/
-#elif defined(CONFIG_JZ4770_PISCES)
-	#define SPEN		(32*4+16)       /*LCD_CS*/
-	#define SPCK		(32*4+15)       /*LCD_SCL*/
-	#define SPDA		(32*4+17)       /*LCD_SDA*/
-	#define LCD_RET 	(32*4+2)       /*LCD_DISP_N use for lcd reset*/
-#else
-#error "driver/video/Jzlcd.h, please define SPI pins on your board."
-#endif
+// #if defined(CONFIG_JZ4760_LCD_AUO_A043FL01V2)
+// #if defined(CONFIG_JZ4770_F4770)
+// 	#define SPEN		(32*4+16)       /*LCD_CS*/
+// 	#define SPCK		(32*4+15)       /*LCD_SCL*/
+// 	#define SPDA		(32*4+17)       /*LCD_SDA*/
+// 	#define LCD_RET 	(32*4+2)       /*LCD_DISP_N use for lcd reset*/
+// #elif defined(CONFIG_JZ4770_PISCES)
+// 	#define SPEN		(32*4+16)       /*LCD_CS*/
+// 	#define SPCK		(32*4+15)       /*LCD_SCL*/
+// 	#define SPDA		(32*4+17)       /*LCD_SDA*/
+// 	#define LCD_RET 	(32*4+2)       /*LCD_DISP_N use for lcd reset*/
+// #else
+// #error "driver/video/jz4770_lcd.h: define SPI pins on your board"
+// #endif
 
-#define __spi_write_reg(reg, val)		\
-	do {					\
-		unsigned char no;		\
-		unsigned short value;		\
-		unsigned char a=0;		\
-		unsigned char b=0;		\
-		a=reg;				\
-		b=val;				\
-		__gpio_as_output1(SPEN); /* use SPDA */	\
-		__gpio_as_output0(SPCK); /* use SPCK */	\
-		udelay(50);			\
-		__gpio_as_output0(SPDA);		\
-		__gpio_as_output0(SPEN);		\
-		udelay(50);			\
-		value=((a<<8)|(b&0xFF));	\
-		for(no=0;no<16;no++)		\
-		{				\
-			if((value&0x8000)==0x8000){	      \
-				__gpio_as_output1(SPDA);}	      \
-			else{				      \
-				__gpio_as_output0(SPDA); }     \
-			udelay(50);			\
-			__gpio_as_output1(SPCK);		\
-			value=(value<<1);		\
-			udelay(50);			\
-			__gpio_as_output0(SPCK);		\
-		}					\
-		__gpio_as_output1(SPEN);			\
-		udelay(400);				\
-	} while (0)
-#define __spi_read_reg(reg,val)			\
-	do{					\
-		unsigned char no;		\
-		unsigned short value;			\
-		value = ((reg << 0) | (1 << 7));	\
-		val = 0;				\
-		__gpio_as_output1(SPEN);			\
-		__gpio_as_output0(SPCK);			\
-		udelay(50);				\
-		__gpio_as_output0(SPDA);			\
-		__gpio_as_output0(SPEN);			\
-		udelay(50);				\
-		for (no = 0; no < 16; no++ ) {		\
-			udelay(50);			\
-			if(no < 8)			\
-			{						\
-				if (value & 0x80) /* send data */	\
-					__gpio_as_output1(SPDA);		\
-				else					\
-					__gpio_as_output0(SPDA);		\
-				udelay(50);				\
-				__gpio_as_output1(SPCK);			\
-				value = (value << 1);			\
-				udelay(50);				\
-				__gpio_as_output0(SPCK);			\
-				if(no == 7)				\
-					__gpio_as_input(SPDA);		\
-			}						\
-			else						\
-			{						\
-				udelay(100);				\
-				__gpio_as_output1(SPCK);			\
-				udelay(50);				\
-				val = (val << 1);			\
-				val |= __gpio_get_pin(SPDA);		\
-				__gpio_as_output0(SPCK);			\
-			}						\
-		}							\
-		__gpio_as_output1(SPEN);					\
-		udelay(400);						\
-	} while(0)
+// #define __spi_write_reg(reg, val)		\
+// 	do {					\
+// 		unsigned char no;		\
+// 		unsigned short value;		\
+// 		unsigned char a=0;		\
+// 		unsigned char b=0;		\
+// 		a=reg;				\
+// 		b=val;				\
+// 		__gpio_as_output1(SPEN); /* use SPDA */	\
+// 		__gpio_as_output0(SPCK); /* use SPCK */	\
+// 		udelay(50);			\
+// 		__gpio_as_output0(SPDA);		\
+// 		__gpio_as_output0(SPEN);		\
+// 		udelay(50);			\
+// 		value=((a<<8)|(b&0xFF));	\
+// 		for(no=0;no<16;no++)		\
+// 		{				\
+// 			if((value&0x8000)==0x8000){	      \
+// 				__gpio_as_output1(SPDA);}	      \
+// 			else{				      \
+// 				__gpio_as_output0(SPDA); }     \
+// 			udelay(50);			\
+// 			__gpio_as_output1(SPCK);		\
+// 			value=(value<<1);		\
+// 			udelay(50);			\
+// 			__gpio_as_output0(SPCK);		\
+// 		}					\
+// 		__gpio_as_output1(SPEN);			\
+// 		udelay(400);				\
+// 	} while (0)
+// #define __spi_read_reg(reg,val)			\
+// 	do{					\
+// 		unsigned char no;		\
+// 		unsigned short value;			\
+// 		value = ((reg << 0) | (1 << 7));	\
+// 		val = 0;				\
+// 		__gpio_as_output1(SPEN);			\
+// 		__gpio_as_output0(SPCK);			\
+// 		udelay(50);				\
+// 		__gpio_as_output0(SPDA);			\
+// 		__gpio_as_output0(SPEN);			\
+// 		udelay(50);				\
+// 		for (no = 0; no < 16; no++ ) {		\
+// 			udelay(50);			\
+// 			if(no < 8)			\
+// 			{						\
+// 				if (value & 0x80) /* send data */	\
+// 					__gpio_as_output1(SPDA);		\
+// 				else					\
+// 					__gpio_as_output0(SPDA);		\
+// 				udelay(50);				\
+// 				__gpio_as_output1(SPCK);			\
+// 				value = (value << 1);			\
+// 				udelay(50);				\
+// 				__gpio_as_output0(SPCK);			\
+// 				if(no == 7)				\
+// 					__gpio_as_input(SPDA);		\
+// 			}						\
+// 			else						\
+// 			{						\
+// 				udelay(100);				\
+// 				__gpio_as_output1(SPCK);			\
+// 				udelay(50);				\
+// 				val = (val << 1);			\
+// 				val |= __gpio_get_pin(SPDA);		\
+// 				__gpio_as_output0(SPCK);			\
+// 			}						\
+// 		}							\
+// 		__gpio_as_output1(SPEN);					\
+// 		udelay(400);						\
+// 	} while(0)
 
-#define __lcd_special_pin_init()		\
-	do {						\
-		udelay(50);				\
-		__gpio_as_output0(LCD_RET);		\
-		udelay(100);				\
-		__gpio_as_output1(LCD_RET);		\
-	} while (0)
-#define __lcd_special_on()			     \
-	do {					     \
-		udelay(50);			     \
-		__gpio_as_output0(LCD_RET);	     \
-		udelay(100);			     \
-		__gpio_as_output1(LCD_RET);	     \
-} while (0)
+// #define __lcd_special_pin_init()		\
+// 	do {						\
+// 		udelay(50);				\
+// 		__gpio_as_output0(LCD_RET);		\
+// 		udelay(100);				\
+// 		__gpio_as_output1(LCD_RET);		\
+// 	} while (0)
+// #define __lcd_special_on()			     \
+// 	do {					     \
+// 		udelay(50);			     \
+// 		__gpio_as_output0(LCD_RET);	     \
+// 		udelay(100);			     \
+// 		__gpio_as_output1(LCD_RET);	     \
+// } while (0)
 
-	#define __lcd_special_off() \
-	do { \
-		__gpio_as_output0(LCD_RET);		\
-	} while (0)
+// 	#define __lcd_special_off() \
+// 	do { \
+// 		__gpio_as_output0(LCD_RET);		\
+// 	} while (0)
 
-#endif	/* CONFIG_JZLCD_AUO_A030FL01_V1 */
+// #endif	/* CONFIG_JZLCD_AUO_A030FL01_V1 */
 
 /* TRULY_TFTG320240DTSW */
-#if defined(CONFIG_JZ4760_LCD_TRULY_TFTG320240DTSW_16BIT) || defined(CONFIG_JZ4760_LCD_TRULY_TFTG320240DTSW_18BIT)
+// #if defined(CONFIG_JZ4760_LCD_TRULY_TFTG320240DTSW_16BIT) || defined(CONFIG_JZ4760_LCD_TRULY_TFTG320240DTSW_18BIT)
 
-#if defined(CONFIG_JZ4770_F4770) 
-#define LCD_RESET_PIN	(32*5+10)// LCD_REV, GPF10
-#else
-#error "Define LCD_RESET_PIN on your board"
-#endif
+// #if defined(CONFIG_JZ4770_F4770)
+// #define LCD_RESET_PIN	(32*5+10)// LCD_REV, GPF10
+// #else
+// #error "Define LCD_RESET_PIN on your board"
+// #endif
 
-#define __lcd_special_on() \
-do { \
-	__gpio_as_output1(LCD_REAS_OUTPUT1); \
-	udelay(100); \
-	__gpio_as_output0(LCD_REAS_OUTPUT1); \
-	udelay(100); \
-	__gpio_as_output1(LCD_REAS_OUTPUT1); \
-} while (0)
+// #define __lcd_special_on() \
+// do { \
+// 	__gpio_as_output1(LCD_REAS_OUTPUT1); \
+// 	udelay(100); \
+// 	__gpio_as_output0(LCD_REAS_OUTPUT1); \
+// 	udelay(100); \
+// 	__gpio_as_output1(LCD_REAS_OUTPUT1); \
+// } while (0)
 
-#endif /* CONFIG_JZ4760_LCD_TRULY_TFTG320240DTSW */
+// #endif /* CONFIG_JZ4760_LCD_TRULY_TFTG320240DTSW */
 
-// Wolfgang 2008.02.23
-#if defined(CONFIG_JZ4760_LCD_TOPPOLY_TD025THEA7_RGB_DELTA) || defined(CONFIG_JZ4760_LCD_TOPPOLY_TD025THEA7_RGB_DUMMY)
+// // Wolfgang 2008.02.23
+// #if defined(CONFIG_JZ4760_LCD_TOPPOLY_TD025THEA7_RGB_DELTA) || defined(CONFIG_JZ4760_LCD_TOPPOLY_TD025THEA7_RGB_DUMMY)
 
-#if defined(CONFIG_JZ4760_LCD_TOPPOLY_TD025THEA7_RGB_DELTA)
-#define PANEL_MODE 0x02		/* RGB Delta */
-#elif defined(CONFIG_JZ4760_LCD_TOPPOLY_TD025THEA7_RGB_DUMMY)
-#define PANEL_MODE 0x00		/* RGB Dummy */
-#endif
+// #if defined(CONFIG_JZ4760_LCD_TOPPOLY_TD025THEA7_RGB_DELTA)
+// #define PANEL_MODE 0x02		/* RGB Delta */
+// #elif defined(CONFIG_JZ4760_LCD_TOPPOLY_TD025THEA7_RGB_DUMMY)
+// #define PANEL_MODE 0x00		/* RGB Dummy */
+// #endif
 
-#if defined(CONFIG_JZ4770_F4770)
-	#define SPEN	(32*2+29)       //GPB29
-	#define SPCK	(32*2+28)       //GPB28
-	#define SPDA	(32*2+21)       //GPB21
-	#define LCD_RET (32*5+6)        // GPF6  //use for lcd reset
-#else
-#error "please define SPI pins on your board."
-#endif
+// #if defined(CONFIG_JZ4770_F4770)
+// 	#define SPEN	(32*2+29)       //GPB29
+// 	#define SPCK	(32*2+28)       //GPB28
+// 	#define SPDA	(32*2+21)       //GPB21
+// 	#define LCD_RET (32*5+6)        // GPF6  //use for lcd reset
+// #else
+// #error "please define SPI pins on your board."
+// #endif
 
-	#define __spi_write_reg1(reg, val) \
-	do { \
-		unsigned char no;\
-		unsigned short value;\
-		unsigned char a=0;\
-		unsigned char b=0;\
-		a=reg;\
-		b=val;\
-		__gpio_as_output1(SPEN);\
-		udelay(100);\
-		__gpio_as_output0(SPCK);\
-		__gpio_as_output0(SPDA);\
-		__gpio_as_output0(SPEN);\
-		udelay(25);\
-		value=((a<<8)|(b&0xFF));\
-		for(no=0;no<16;no++)\
-		{\
-			__gpio_as_output0(SPCK);\
-			if((value&0x8000)==0x8000)\
-				__gpio_as_output1(SPDA);\
-			else\
-				__gpio_as_output0(SPDA);\
-			udelay(25);\
-			__gpio_as_output1(SPCK);\
-			value=(value<<1); \
-			udelay(25);\
-		 }\
-		__gpio_as_output0(SPCK);\
-		__gpio_as_output1(SPEN);\
-		udelay(100);\
-	} while (0)
+// 	#define __spi_write_reg1(reg, val) \
+// 	do { \
+// 		unsigned char no;\
+// 		unsigned short value;\
+// 		unsigned char a=0;\
+// 		unsigned char b=0;\
+// 		a=reg;\
+// 		b=val;\
+// 		__gpio_as_output1(SPEN);\
+// 		udelay(100);\
+// 		__gpio_as_output0(SPCK);\
+// 		__gpio_as_output0(SPDA);\
+// 		__gpio_as_output0(SPEN);\
+// 		udelay(25);\
+// 		value=((a<<8)|(b&0xFF));\
+// 		for(no=0;no<16;no++)\
+// 		{\
+// 			__gpio_as_output0(SPCK);\
+// 			if((value&0x8000)==0x8000)\
+// 				__gpio_as_output1(SPDA);\
+// 			else\
+// 				__gpio_as_output0(SPDA);\
+// 			udelay(25);\
+// 			__gpio_as_output1(SPCK);\
+// 			value=(value<<1); \
+// 			udelay(25);\
+// 		 }\
+// 		__gpio_as_output0(SPCK);\
+// 		__gpio_as_output1(SPEN);\
+// 		udelay(100);\
+// 	} while (0)
 
-	#define __spi_write_reg(reg, val) \
-	do {\
-		__spi_write_reg1((reg<<2), val); \
-		udelay(100); \
-	}while(0)
+// 	#define __spi_write_reg(reg, val) \
+// 	do {\
+// 		__spi_write_reg1((reg<<2), val); \
+// 		udelay(100); \
+// 	}while(0)
 
-	#define __lcd_special_pin_init() \
-	do { \
-		__gpio_as_output1(LCD_RET);\
-		mdelay(15);\
-		__gpio_as_output0(LCD_RET);\
-		mdelay(15);\
-		__gpio_as_output1(LCD_RET);\
-	} while (0)
+// 	#define __lcd_special_pin_init() \
+// 	do { \
+// 		__gpio_as_output1(LCD_RET);\
+// 		mdelay(15);\
+// 		__gpio_as_output0(LCD_RET);\
+// 		mdelay(15);\
+// 		__gpio_as_output1(LCD_RET);\
+// 	} while (0)
 
-	#define __lcd_special_on() \
-	do { \
-	mdelay(10); \
-	__spi_write_reg(0x00, 0x10); \
-	__spi_write_reg(0x01, 0xB1); \
-	__spi_write_reg(0x00, 0x10); \
-	__spi_write_reg(0x01, 0xB1); \
-	__spi_write_reg(0x02, PANEL_MODE); /* RGBD MODE */ \
-	__spi_write_reg(0x03, 0x01); /* Noninterlace*/	\
-	mdelay(10); \
-	} while (0)
+// 	#define __lcd_special_on() \
+// 	do { \
+// 	mdelay(10); \
+// 	__spi_write_reg(0x00, 0x10); \
+// 	__spi_write_reg(0x01, 0xB1); \
+// 	__spi_write_reg(0x00, 0x10); \
+// 	__spi_write_reg(0x01, 0xB1); \
+// 	__spi_write_reg(0x02, PANEL_MODE); /* RGBD MODE */ \
+// 	__spi_write_reg(0x03, 0x01); /* Noninterlace*/	\
+// 	mdelay(10); \
+// 	} while (0)
 
-	#define __lcd_special_off() \
-	do { \
-	} while (0)
+// 	#define __lcd_special_off() \
+// 	do { \
+// 	} while (0)
 
-#endif	/* CONFIG_JZ4760_LCD_TOPPOLY_TD025THEA7_RGB_DELTA */
+// #endif	/* CONFIG_JZ4760_LCD_TOPPOLY_TD025THEA7_RGB_DELTA */
 
 
 #if defined(CONFIG_JZ4760_LCD_FOXCONN_PT035TN01) || defined(CONFIG_JZ4760_LCD_INNOLUX_PT035TN01_SERIAL)
@@ -329,7 +329,7 @@ do { \
         #define SPDA            (32*1+29)       /*LCD_SDA GPB29*/
         #define LCD_RET         (32*4+12)       /*LCD_RESET use for lcd reset*/
 #else
-#error "driver/video/Jzlcd.h, please define SPI pins on your board."
+#error "driver/video/jz4770_lcd.h, please define SPI pins on your board."
 #endif
 
 	#define __spi_write_reg1(reg, val) \
@@ -509,8 +509,63 @@ do { \
 		udelay(400);						\
 	} while(0)
 
+#else
+#define LCD_SPI_EN   (32*4+16)
+#define LCD_SPI_CLK  (32*4+15)
+#define LCD_SPI_DT   (32*4+17)
+
+#define  __spi_write_byte(reg,data)   \
+do {                   \
+	int i,j;         \
+	unsigned short value = 0;  \
+	value = (reg & 0x3f) << 10;   \
+	value |= (0x0200 | data);    \
+	__gpio_clear_pin(LCD_SPI_EN);   \
+	for (i=0;i<16;i++){             \
+		__gpio_clear_pin(LCD_SPI_CLK);   \
+		udelay(500);                  \
+		j = value & 0x8000;         \
+		if (j == 0x8000){             \
+			__gpio_set_pin(LCD_SPI_DT);   \
+		}else{                              \
+			__gpio_clear_pin(LCD_SPI_DT);    \
+		}                     \
+		udelay(500);         \
+		__gpio_set_pin(LCD_SPI_CLK);    \
+		udelay(500);         \
+		value <<= 1;      \
+	}            \
+	__gpio_set_pin(LCD_SPI_EN);  \
+	udelay(2000);     \
+}while(0)
+
+#define  __lcd_special_on()  \
+do {                \
+	__spi_write_byte(0x01,0x00);           \
+	__spi_write_byte(0x02,0x03);     \
+	__spi_write_byte(0x03,0xcc);     \
+	__spi_write_byte(0x04,0x46);    \
+	__spi_write_byte(0x05,0x0d);   \
+	__spi_write_byte(0x06,0x00);   \
+	__spi_write_byte(0x07,0x00);    \
+	__spi_write_byte(0x08,0x08);   \
+	__spi_write_byte(0x09,0x40);      \
+	__spi_write_byte(0x0a,0x88);   \
+	__spi_write_byte(0x0b,0x88);    \
+	__spi_write_byte(0x0c,0x20);    \
+	__spi_write_byte(0x0d,0x20);   \
+	__spi_write_byte(0x0e,0x67);   \
+	__spi_write_byte(0x0f,0xa4);  \
+	__spi_write_byte(0x10,0x04);  \
+	__spi_write_byte(0x11,0x24);   \
+	__spi_write_byte(0x12,0x24);   \
+	__spi_write_byte(0x1E,0x67);   \
+	__spi_write_byte(0x20,0x00);    \
+}while(0)
+
 #endif
 
+#if 0
 #define __lcd_special_pin_init()		\
 	do {						\
 		__gpio_as_output1(SPEN);			\
@@ -520,6 +575,16 @@ do { \
 		__gpio_as_output1(LCD_RET);	\
 		udelay(1000);			\
 	} while (0)
+#else
+#define __lcd_special_pin_init()		\
+	do {						\
+		__gpio_as_output0(LCD_RET);	\
+		udelay(1000);			\
+		__gpio_as_output1(LCD_RET);	\
+		udelay(1000);			\
+	} while (0)
+
+#endif
 
 #if 0
 #define __lcd_special_on()			\
@@ -885,6 +950,30 @@ static void SlcdInit(void)
 	} while (0)
 #endif //CONFIG_JZ4760_LCD_KD101N4
 
+#if defined(UMIDO_LCD_4_3)
+#if defined(CONFIG_JZ4770_PISCES)
+    #define LCD_RET 	(32*4 + 2)       /*GPE2 LCD_DISP_N use for lcd reset*/
+#else
+#error "driver/video/jz4770_lcd.h, please define reset pins on your board."
+#endif
+#define __lcd_special_pin_init() \
+  do { \
+    __gpio_as_output(LCD_RET);\
+    udelay(50);\
+    __gpio_clear_pin(LCD_RET);\
+    mdelay(150);\
+    __gpio_set_pin(LCD_RET);\
+  } while (0)
+#define __lcd_special_on() \
+  do { \
+    ; \
+  } while (0)
+#define __lcd_special_off() \
+  do { \
+    ;\
+  } while (0)
+#endif
+
 #ifndef __lcd_special_pin_init
 #define __lcd_special_pin_init()
 #endif
@@ -899,24 +988,78 @@ static void SlcdInit(void)
 /*
  * Platform specific definition
  */
+//	__lcd_special_on();
 #if defined(CONFIG_JZ4760_VGA_DISPLAY)
 #define __lcd_display_pin_init()
 #define __lcd_display_on()
 #define __lcd_display_off()
 #elif defined(CONFIG_JZ4770_PISCES)
+
 #define __lcd_display_pin_init() \
 do { \
+        __gpio_as_output(GPIO_LCD_VCC_EN_N);	 \
+        __gpio_as_output(GPIO_LCD_PWM);	 \
+	__lcd_special_pin_init();	   \
+} while (0)
+#define __lcd_display_pin_init_new() \
+do { \
+        __gpio_as_output1(GPIO_LCD_VCC_EN_N);	 \
 	__lcd_special_pin_init();	   \
 } while (0)
 
+#if 0
 #define __lcd_display_on() \
 do { \
 	__lcd_special_on();			\
+        __lcd_set_backlight_level(1);		\
+        printk("kyo display on1 \n");       \
+        mdelay(10); \
+        __gpio_set_pin(GPIO_LCD_VCC_EN_N);	\
+        mdelay(10); \
+        printk("kyo display on2 GPIO_LCD_VCC_EN_N is %d\n",GPIO_LCD_VCC_EN_N);       \
+        __lcd_set_backlight_level(10);		\
+    mdelay(10); \
+    __lcd_set_backlight_level(10);		\
+    mdelay(10); \
+    __lcd_set_backlight_level(20);		\
+    mdelay(10); \
+    __lcd_set_backlight_level(30);		\
+    mdelay(10); \
+    __lcd_set_backlight_level(40);		\
+    mdelay(10); \
+    __lcd_set_backlight_level(50);		\
+    mdelay(10); \
+    __lcd_set_backlight_level(60);		\
+    mdelay(10); \
+    __lcd_set_backlight_level(70);		\
+    mdelay(10); \
+    __lcd_set_backlight_level(80);		\
+    mdelay(10); \
+        __gpio_set_pin(GPIO_LCD_VCC_EN_N);	\
 } while (0)
+#else
+
+#define LCD_RET 	(32*4 + 2)       /*GPE2 LCD_DISP_N use for lcd reset*/
+
+#define __lcd_display_on() \
+do { \
+        __gpio_set_pin(GPIO_LCD_VCC_EN_N);	\
+	__lcd_special_on();			\
+        __gpio_as_output(LCD_RET);              \
+        udelay(50);\
+        __gpio_clear_pin(LCD_RET);              \
+        mdelay(550);\
+        __gpio_set_pin(LCD_RET);                \
+	mdelay(500);             \
+    __lcd_set_backlight_level(80);		\
+} while (0)
+
+#endif
 
 #define __lcd_display_off() \
 do { \
-	__lcd_special_off(); \
+	__lcd_close_backlight();	   \
+	__lcd_special_off();	 \
 } while (0)
 
 #else /* other boards */
@@ -959,4 +1102,7 @@ do { \
 #define __lcd_set_backlight_level(n)
 #endif
 
-#endif /* __JZ4760_LCD_H__ */
+static void jz4760fb_set_panel_mode(struct jz4760lcd_info *lcd_info);
+static void jz4760fb_change_clock(struct jz4760lcd_info *lcd_info);
+
+#endif /* __JZ4770_LCD_H__ */

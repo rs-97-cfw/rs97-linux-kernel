@@ -45,6 +45,8 @@
 #define REG_V_PHY_T_ADDR	0x5c /* Input V Physical Table Address Register */
 #define REG_OUT_PHY_T_ADDR	0x60 /* Output Physical Table Address Register */
 
+#define REG_IPU_CTRL REG32(IPU_V_BASE + REG_CTRL)
+
 /* REG_CTRL: IPU Control Register */
 #define IPU_CE_SFT	0x0
 #define IPU_CE_MSK	0x1

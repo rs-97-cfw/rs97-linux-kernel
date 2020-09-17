@@ -285,7 +285,7 @@ static int plat_real_irq(int irq)
 asmlinkage void plat_irq_dispatch(void)
 {
 	int irq = 0;
-	static unsigned long intc_ipr = 0;
+	unsigned long intc_ipr = 0;
 
 	intc_ipr |= REG_INTC_IPR;
 

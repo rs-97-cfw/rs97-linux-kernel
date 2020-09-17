@@ -35,6 +35,13 @@ obj-$(CONFIG_ZD1211RW)		+= zd1211rw/
 obj-$(CONFIG_RTL8180)		+= rtl818x/
 obj-$(CONFIG_RTL8187)		+= rtl818x/
 
+# usb wifi, 8188ES and 8188ETV use the same copy of driver
+obj-$(CONFIG_RTL8188EU)		+= rtl8188etv/
+
+# sdio wifi, 8189ES and 8189ETV use the same copy of driver
+obj-$(CONFIG_RTL8189ES)		+= rtl8189es/
+
+
 # 16-bit wireless PCMCIA client drivers
 obj-$(CONFIG_PCMCIA_RAYCS)	+= ray_cs.o
 obj-$(CONFIG_PCMCIA_WL3501)	+= wl3501_cs.o

@@ -17,6 +17,7 @@
 
 #include <asm/jzsoc.h>
 #include "jz4760_tve.h"
+#include "jz4760_lcd.h"
 
 #if 0
 struct jz4760tve_info jz4760_tve_info_PAL = {
@@ -119,5 +120,45 @@ void jz4760tve_init( int tve_mode )
 	}
 
 	jz4760tve_set_tve_mode( jz4760_tve_info );
-//	jz4760tve_enable_tve();
+
+	udelay(100);
+	cpm_start_clock(CGM_TVE);
+
+	jz4760tve_enable_tve();
 }
+
+void jz4760tve_stop(void)
+{
+	jz4760tve_disable_tve();
+	cpm_stop_clock(CGM_TVE);
+}
+
+struct jz4760lcd_info jz4760_info_tve = {
+	.panel = {
+		.cfg = LCD_CFG_TVEN |					// output to tve
+			   LCD_CFG_NEWDES |					// 8words descriptor
+			   LCD_CFG_RECOVER |				// underrun protect
+			   LCD_CFG_MODE_INTER_CCIR656 |		// Interlace CCIR656 mode
+			   LCD_CFG_TVEPEH,
+		.ctrl = LCD_CTRL_OFUM | LCD_CTRL_BST_16,// 16words burst
+		TVE_WIDTH_PAL, TVE_HEIGHT_PAL, TVE_FREQ_PAL, 0, 0, 0, 0, 0, 0,
+	},
+	.osd = {
+		.osd_cfg = LCD_OSDC_OSDEN |			// Use OSD mode
+				   // LCD_OSDC_ALPHAEN |	// enable alpha
+				   // LCD_OSDC_F0EN,		// enable Foreground0
+				   LCD_OSDC_F1EN,			// enable Foreground1
+		.osd_ctrl = LCD_OSDCTRL_IPU, // |	// enable ipu
+				    // LCD_OSDCTRL_OSDBPP_15_16,
+		// .osd_ctrl = 0,					// disable ipu
+		.rgb_ctrl = LCD_RGBC_YCC,			// enable RGB => YUV
+		.bgcolor = 0x00000000,				// set background color Black
+		.colorkey0 = 0x80000000,			// disable colorkey
+		.colorkey1 = 0x80000000,			// disable colorkey
+		.alpha = 0xA0,						// alpha value
+		.ipu_restart = 0x80000100,			// ipu restart
+		.fg_change = FG_CHANGE_ALL,			// change all initially
+		.fg0 = {16, 0, 0, 320, 240},		// bpp, x, y, w, h
+		.fg1 = {16, 0, 0, 320, 240},		// bpp, x, y, w, h
+	},
+};

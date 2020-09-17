@@ -12,10 +12,12 @@ obj-$(CONFIG_PROC_FS)		+= proc.o
 # board specific support
 
 obj-$(CONFIG_JZ4750L_F4750L)	+= board-f4750l.o
+obj-$(CONFIG_JZ4750L_SPWAM)	+= board-spwam.o
+obj-$(CONFIG_JZ4750L_TAURUS)	+= board-taurus.o
 
 # PM support
 
-obj-$(CONFIG_PM_LEGACY)         +=pm.o
+obj-$(CONFIG_PM)         +=pm.o
 
 # CPU Frequency scaling support
 

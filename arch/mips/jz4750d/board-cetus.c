@@ -23,9 +23,14 @@
 #include <asm/bootinfo.h>
 #include <asm/mipsregs.h>
 #include <asm/reboot.h>
+#include <linux/i2c.h>
+#include <linux/i2c-gpio.h>
+#include <linux/platform_device.h>
 
 #include <asm/jzsoc.h>
 #include <linux/spi/spi.h>
+#include <linux/gwtc9xxxb_ts.h>
+#include <media/jz_cim.h> 
 
 void __init board_msc_init(void);
 
@@ -218,6 +223,75 @@ struct jz_mmc_platform_data cetus_tf_data = {
 #endif
 };
 
+#ifdef CONFIG_VIDEO_OV5640               
+struct jz_sensor_platform_data ov5640_pdata = {
+	.cim_id = 0,
+	.rst_pin = GPIO_OV5640_RST,
+	.pd_pin = GPIO_OV5640_PWDN,
+};
+#endif
+
+#ifdef CONFIG_VIDEO_GC2035
+struct jz_sensor_platform_data gc2035_pdata = {
+	.cim_id = 0,
+	.rst_pin = GPIO_GC2035_RST,
+	.pd_pin = GPIO_GC2035_PWDN,
+};
+#endif
+
+static struct gwtc9xxxb_ts_platform_data gwtc9xxxb_ts_pdata = {                                           
+	.intr = GPIO_GWTC9XXXB_INT,                                                                       
+};                            
+#if defined(CONFIG_I2C_GPIO)
+static struct i2c_board_info pyxis_gpio_i2c_devs[] __initdata = {
+#ifdef CONFIG_VIDEO_OV5640                                                                                
+        {                                                                                           
+                 I2C_BOARD_INFO("ov5640", 0x3c),                                                    
+                 .platform_data  = &ov5640_pdata,                                              
+        },
+#endif
+#ifdef CONFIG_VIDEO_GC2035
+	{
+		I2C_BOARD_INFO("gc2035", 0x3c),
+		.platform_data  = &gc2035_pdata,
+	}
+#endif
+#ifdef CONFIG_TOUCHSCREEN_GWTC9XXXB	
+	{                                                                                                 
+                I2C_BOARD_INFO(GWTC9XXXB_NAME, 0x05),                                                     
+                .irq = GPIO_GWTC9XXXB_IRQ,                                                                
+                .platform_data = &gwtc9xxxb_ts_pdata,                                                     
+        },                                                                                        
+#endif                                                                                               
+};
+static struct i2c_gpio_platform_data pyxis_i2c_gpio_data = {
+        .sda_pin        = (32*4+12),
+        .scl_pin        = (32*4+13),
+};
+static struct platform_device pyxis_i2c_gpio_device = {
+        .name   = "i2c-gpio",
+        .id     = 0,
+        .dev    = {
+                .platform_data = &pyxis_i2c_gpio_data,
+        },
+};
+static struct platform_device *pyxis_platform_devices[] __initdata = {
+        &pyxis_i2c_gpio_device,
+};
+#endif
+/*i2c devices*/                                                                                           
+static struct i2c_board_info cetus_i2c0_devs[] __initdata = {                                             
+        {                                                                                                 
+                I2C_BOARD_INFO("ov3640", 0x3c),                                                           
+        },                                                                                                
+};                                                                                                        
+void __init board_i2c_init(void) {                                                                        
+	//i2c_register_board_info(0, cetus_i2c0_devs, ARRAY_SIZE(cetus_i2c0_devs));                         
+#if defined(CONFIG_I2C_GPIO)
+	i2c_register_board_info(0, pyxis_gpio_i2c_devs, ARRAY_SIZE(pyxis_gpio_i2c_devs));
+	platform_add_devices(pyxis_platform_devices, ARRAY_SIZE(pyxis_platform_devices));
+#endif
+}             
 /* SPI devices */
 struct spi_board_info cetus_spi0_board_info[]  = {
 	[0] = {

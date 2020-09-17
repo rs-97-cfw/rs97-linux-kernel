@@ -267,6 +267,12 @@ config 5x5_KEYBOARD_JZ
 	  To compile this driver as a module, choose M here: the
 	  module will be called jz-keypad.
 
+config KEYBOARD_SADCIN
+	tristate "SADC Key Buttons"
+	depends on MFD_JZ4750L_SADC
+	help
+	  Say Y here if your device has buttons connected directly to SADCIN pins.
+
 config KEYBOARD_GPIO
 	tristate "JZ GPIO Buttons support"
 #	depends on GENERIC_GPIO

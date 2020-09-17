@@ -498,7 +498,7 @@ void __handle_sysrq(int key, struct tty_struct *tty, int check_mask)
 	 */
 	orig_log_level = console_loglevel;
 	console_loglevel = 7;
-	printk(KERN_INFO "SysRq : ");
+	printk(KERN_INFO "SysRq: ");
 
         op_p = __sysrq_get_key_op(key);
         if (op_p) {
@@ -514,7 +514,7 @@ void __handle_sysrq(int key, struct tty_struct *tty, int check_mask)
 			printk("This sysrq operation is disabled.\n");
 		}
 	} else {
-		printk("HELP : ");
+		printk("HELP: ");
 		/* Only print the help msg once per handler */
 		for (i = 0; i < ARRAY_SIZE(sysrq_key_table); i++) {
 			if (sysrq_key_table[i]) {

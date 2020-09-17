@@ -176,7 +176,7 @@ static struct mtd_partition partition_info[] = {
 	 size:100 * 0x100000LL,
 	 use_planes: 0},
 
-#if 0	 
+#if 0
 	{name:"NAND VFAT partition",
 	 offset:512 * 0x100000LL,
 	 size:1536 * 0x100000LL,
@@ -217,6 +217,79 @@ static int partition_reserved_badblocks[] = {
 #endif
 };				/* reserved blocks of mtd5 */
 #endif				/* CONFIG_JZ4760_CYGNUS || CONFIG_JZ4760_LEPUS */
+
+#if defined(CONFIG_JZ4760B_CARINA)
+static struct mtd_partition partition_info[] = {
+	{name:"NAND BOOT partition",
+	 offset:0 * 0x100000LL,
+	 size:4 * 0x100000LL,
+	 use_planes: 0},
+	{name:"NAND KERNEL partition",
+	 offset:4 * 0x100000LL,
+	 size:4 * 0x100000LL,
+	 use_planes: 0},
+	{name:"NAND UBIFS partition",
+	 offset:8 * 0x100000LL,
+	 size:222 * 0x100000LL,
+	 use_planes: 0},
+	{name:"NAND UBIFS_RW partition",
+	 offset:230 * 0x100000LL,
+	 size:10 * 0x100000LL,
+	 use_planes: 0},
+	{name:"NAND UBIFS_RO partition",
+	 offset:240 * 0x100000LL,
+	 size:10 * 0x100000LL,
+	 use_planes: 0},
+#if 0
+	{name:"NAND UBIFS_RW partition",
+	 offset:108 * 0x100000LL,
+	 size:10 * 0x100000LL,
+	 use_planes: 0},
+	{name:"NAND UBIFS_RO partition",
+	 offset:118 * 0x100000LL,
+	 size:10 * 0x100000LL,
+	 use_planes: 0},
+
+	{name:"NAND VFAT partition",
+	 offset:512 * 0x100000LL,
+	 size:1536 * 0x100000LL,
+	 use_planes: 0},
+
+	{name:"NAND ROOTFS partition",
+	 offset:8 * 0x100000LL,
+	 size:504 * 0x100000LL,
+	 use_planes: 0},
+	{name:"NAND DATA partition",
+	 offset:512 * 0x100000LL,
+	 size:512 * 0x100000LL,
+	 use_planes: 1},
+	{name:"NAND VFAT partition",
+	 offset:1024 * 0x100000LL,
+	 size:1024 * 0x100000LL,
+	 use_planes: 1},
+#endif
+};
+
+/* Define max reserved bad blocks for each partition.
+ * This is used by the mtdblock-jz.c NAND FTL driver only.
+ *
+ * The NAND FTL driver reserves some good blocks which can't be
+ * seen by the upper layer. When the bad block number of a partition
+ * exceeds the max reserved blocks, then there is no more reserved
+ * good blocks to be used by the NAND FTL driver when another bad
+ * block generated.
+ */
+static int partition_reserved_badblocks[] = {
+	2,			/* reserved blocks of mtd0 */
+	2,			/* reserved blocks of mtd1 */
+	20,			/* reserved blocks of mtd2 */
+	20,			/* reserved blocks of mtd3 */
+#if 0
+	20,			/* reserved blocks of mtd4 */
+	20
+#endif
+};				/* reserved blocks of mtd5 */
+#endif				/* CONFIG_JZ4760B_CARINA */
 
 #if defined(CONFIG_JZ_NANDSZ_128M_RFS_76M)
 static struct mtd_partition partition_info[] = {
@@ -862,7 +935,7 @@ static int jzsoc_nand_calculate_bch_ecc(struct mtd_info *mtd, const u_char * dat
 	for (i = 0; i < oob_per_eccsize; i++) {
 		REG_BCH_DR = ((struct buf_be_corrected *)dat)->oob[i];
 	}
-#endif 
+#endif
 	__ecc_encode_sync();
 	__ecc_disable();
 

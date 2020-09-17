@@ -15,5 +15,6 @@ obj-$(CONFIG_SND_SOC)	+= sh/
 obj-$(CONFIG_SND_SOC)	+= txx9/
 obj-$(CONFIG_SND_SOC)	+= jz4740/
 obj-$(CONFIG_SND_SOC)	+= jz4750/
+#obj-$(CONFIG_SND_SOC)	+= jz4760/
 obj-$(CONFIG_SND_SOC)	+= jz47xx/
 

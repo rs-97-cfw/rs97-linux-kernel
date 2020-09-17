@@ -168,16 +168,20 @@ static struct wakeup_key_s wakeup_key[] = {
 		.gpio = GPIO_POWER_ON,
 		.active_low = ACTIVE_LOW_WAKE_UP,
 	},
+	{
+		.gpio = UMIDO_KEY_START,
+		.active_low = !ACTIVE_LOW_WAKE_UP,
+	},
 #ifndef CONFIG_JZ_SYSTEM_AT_CARD
 	{
 		.gpio = MSC0_HOTPLUG_PIN,
 		.active_low = ACTIVE_LOW_MSC0_CD,
 	},
 #endif
-	{
-		.gpio = MSC2_HOTPLUG_PIN,
-		.active_low = ACTIVE_LOW_MSC2_CD,
-	},
+	// {
+	// 	.gpio = MSC2_HOTPLUG_PIN,
+	// 	.active_low = ACTIVE_LOW_MSC2_CD,
+	// },
 };
 
 static void wakeup_key_setup(void)
@@ -444,10 +448,10 @@ struct jz_mmc_platform_data lepus_sd_data = {
 static void lepus_tf_gpio_init(struct device *dev)
 {
 	__gpio_e_as_msc2_4bit();
-	
+
 	__gpio_as_output(GPIO_SD2_VCC_EN_N);
 	__gpio_set_pin(GPIO_SD2_VCC_EN_N); /* poweroff */
-	
+
 	__gpio_as_input(GPIO_SD2_CD_N);
 	__gpio_enable_pull(GPIO_SD2_CD_N);//allen
 }
@@ -488,7 +492,7 @@ static unsigned int lepus_tf_status(struct device *dev)
 static void lepus_tf_plug_change(int state)
 {
 	__gpio_enable_pull(GPIO_SD2_CD_N);//allen add
-	
+
 	if(state == CARD_INSERTED) /* wait for remove */
 #if ACTIVE_LOW_MSC2_CD
 		__gpio_as_irq_high_level(MSC2_HOTPLUG_PIN);
@@ -535,7 +539,7 @@ static void lepus_msc1_gpio_init(struct device *dev)
 	__gpio_as_msc1_4bit();
 	__gpio_as_output(GPIO_SD1_VCC_EN_N);
 	__gpio_set_pin(GPIO_SD1_VCC_EN_N); /* poweroff */
-	
+
 	__gpio_as_input(GPIO_SD1_CD_N);
 	__gpio_enable_pull(GPIO_SD1_CD_N);//allen
 	return;
@@ -544,7 +548,7 @@ static void lepus_msc1_gpio_init(struct device *dev)
 static void lepus_msc1_power_on(struct device *dev)
 {
 	__gpio_as_msc1_4bit();
-	
+
 	__msc1_enable_power();
 	return;
 }
@@ -563,7 +567,7 @@ static void lepus_msc1_cpm_start(struct device *dev)
 static unsigned int lepus_msc1_status(struct device *dev)
 {
 	unsigned int status = 0;
-	
+
 	__gpio_enable_pull(GPIO_SD1_CD_N);//allen add
 
 	status = (unsigned int) __gpio_get_pin(GPIO_SD1_CD_N);
@@ -578,7 +582,7 @@ static unsigned int lepus_msc1_status(struct device *dev)
 static void lepus_msc1_plug_change(int state)
 {
 	__gpio_enable_pull(GPIO_SD1_CD_N);//allen add
-	
+
 	if(state == CARD_INSERTED) /* wait for remove */
 #if ACTIVE_LOW_MSC1_CD
 		__gpio_as_irq_high_level(MSC1_HOTPLUG_PIN);
@@ -666,12 +670,10 @@ static struct i2c_board_info lepus_i2c0_devs[] __initdata = {
 
 };
 
-static struct i2c_board_info lepus_i2c1_devs[] __initdata = { 
+static struct i2c_board_info lepus_i2c1_devs[] __initdata = {
 	{
 		I2C_BOARD_INFO("fm5807_i2c",0x11),   //0x11
 	},
-
-
 };
 
 
@@ -711,7 +713,7 @@ void __init jz_board_setup(void)
 {
 	printk("JZ4760B Lepus board setup\n");
 	board_cpm_setup();
-	
+
 
 	jz_timer_callback = f4760b_timer_callback;
 }
@@ -741,9 +743,9 @@ static struct platform_device board_button_device = {
 
 
 static int __init lepus_board_init(void)
-{                                                                              
+{
 	platform_device_register(&board_button_device);
-	
+
 	return 0;
 }
 

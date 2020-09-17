@@ -141,7 +141,6 @@ static void jz_set_alarm(void)
 #if 0
 	if(rtc_rtcsar <= rtc_rtcsr) {
 #endif
-		printk("1\n");
 		rtc_write_reg(RTC_RTCSAR,rtc_rtcsr + ALARM_TIME);
 		rtc_set_reg(RTC_RTCCR,0x3<<2); /* alarm enable, alarm interrupt enable */
 //		alarm_state = 1;	       /* alarm on */
@@ -164,7 +163,8 @@ static void jz_set_alarm(void)
 	rtc_rtcsar = rtc_read_reg(RTC_RTCSAR); /* second alarm register */
 	rtc_rtcsr = rtc_read_reg(RTC_RTCSR); /* second register */
 
-	printk("rtc_rtcsar = %u rtc_rtcsr = %u alarm_state = %d\n", rtc_rtcsar, rtc_rtcsr, alarm_state);
+	// printk("rtc_rtcsar=%u; rtc_rtcsr=%u; alarm_state=%d\n", rtc_rtcsar, rtc_rtcsr, alarm_state);
+	printk("Suspend: on\n");
 }
 #undef ALARM_TIME
 #endif
@@ -257,10 +257,10 @@ static int jz_pm_do_sleep(void)
 	/* power down the p0 */
 	SETREG32(CPM_OPCR, OPCR_PD);
 
-      	/* Clear previous reset status */
+  	/* Clear previous reset status */
 	CLRREG32(CPM_RSR, RSR_PR | RSR_WR | RSR_P0R);
 
-       	/* Set resume return address */
+   	/* Set resume return address */
 	OUTREG32(CPM_CPSPPR, 0x00005a5a);
 	udelay(1);
 	OUTREG32(CPM_CPSPR, virt_to_phys(jz_cpu_resume));
@@ -314,7 +314,6 @@ static int jz_pm_do_sleep(void)
 	/* End of the prefetching codes */
 #endif
 
-
 	REG_MSC_LPM(0) = 0x1;
 	/*if power down p0 ,return from sleep.S*/
 
@@ -344,7 +343,7 @@ static int jz_pm_do_sleep(void)
 
 	CLRREG32(CPM_RSR, RSR_PR | RSR_WR | RSR_P0R);
 
-	printk("===>Leave CPU Sleep\n");
+	printk("Suspend: off\n");
 #if 0
 #if  defined(CONFIG_RTC_DRV_JZ4760B) && defined(CONFIG_BATTERY_JZ)
 	if((INREG32(RTC_RTCCR) & RTCCR_AF)) {
@@ -364,6 +363,10 @@ static int jz_pm_do_sleep(void)
 	jz_restore_alarm();
 #endif
 #endif
+
+	mdelay(50);
+	while(!__gpio_get_pin(GPIO_POWER_ON) || __gpio_get_pin(UMIDO_KEY_START));
+
 	return 0;
 }
 

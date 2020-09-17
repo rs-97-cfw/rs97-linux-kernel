@@ -45,6 +45,41 @@
 #define ACT8600_REG6_VCON	0x61
 #define ACT8600_REG7_VCON	0x71
 #define ACT8600_REG8_VCON	0x81
+	#define ACT8600_REG_VCON_OK		(1 << 0)
+	#define ACT8600_REG_VCON_DIS		(1 << 2)
+	#define ACT8600_REG_VCON_ON		(1 << 7)
+
+#define ACT8600_APCH_INTR0	0xa1
+	#define ACT8600_APCH_INTR0_SUS		(1 << 7)
+#define ACT8600_APCH_INTR1	0xa8
+	#define ACT8600_APCH_INTR1_INSTAT 	(1 << 5)
+	#define ACT8600_APCH_INTR1_CHGSTAT 	(1 << 4)
+	#define ACT8600_APCH_INTR1_INDAT 	(1 << 1)
+	#define ACT8600_APCH_INTR1_CHGDAT 	(1 << 0)
+#define ACT8600_APCH_INTR2	0xa9
+	#define ACT8600_APCH_INTR2_INCON 	(1 << 5)
+	#define ACT8600_APCH_INTR2_CHGEOCIN 	(1 << 4)
+	#define ACT8600_APCH_INTR2_INDIS 	(1 << 1)
+	#define ACT8600_APCH_INTR2_CHGEOCOUT 	(1 << 0)
+#define ACT8600_APCH_STAT	0xaa
+	#define ACT8600_APCH_STAT_STATE_MASK	(0x30)
+	#define ACT8600_APCH_STAT_STATE_PRE	(0x30)
+	#define ACT8600_APCH_STAT_STATE_CHAGE	(0x20)
+	#define ACT8600_APCH_STAT_STATE_EOC	(0x10)
+	#define ACT8600_APCH_STAT_STATE_SUSPEND	(0x00)
+
+#define ACT8600_OTG_CON		0xb0
+	#define ACT8600_OTG_CON_Q1		(1 << 7)
+	#define ACT8600_OTG_CON_Q2		(1 << 6)
+	#define ACT8600_OTG_CON_Q3		(1 << 5)
+	#define ACT8600_OTG_CON_DBLIMITQ3	(1 << 1)
+	#define ACT8600_OTG_CON_VBUSDAT		(1 << 0)
+#define ACT8600_OTG_INTR	0xb2
+	#define ACT8600_OTG_INTR_INVBUSR	((1 << 7) | 0x3)
+	#define ACT8600_OTG_INTR_INVBUSF	((1 << 6) | 0x3)
+
+#define ACT8600_SYS0		0x00
+#define ACT8600_SYS1		0x01
 
 #define ACT8600_NAME		"act8600"
 
@@ -61,6 +96,13 @@ struct act8600_platform_pdata_t{
 
 //act8600_output_enable(ACT8600_OUT8,ACT8600_OUT_ON);
 int act8600_output_enable(int outnum,int enable);
+int act8600_write_reg(char reg,char val);
+int act8600_read_reg(char reg,char *val);
+int act8600_set_q1(int enable);
+int act8600_set_q3(int enable);
+int act8600_set_double_q3(int enable);
+void act8600_start_recharging(void);
+	
 /*
  * voltage control
  */

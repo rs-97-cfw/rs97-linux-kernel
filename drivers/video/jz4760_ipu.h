@@ -1,6 +1,37 @@
 #ifndef __IPU_H_ME__
 #define __IPU_H_ME__
 
+// medive add // pingflood mod; defined in arch/mips/include/asm/mach-jz*/jz*ipu.h
+#define IPU_CTRL	            (IPU_V_BASE + REG_CTRL          ) /* IPU Control Register */
+#define IPU_STATUS	            (IPU_V_BASE + REG_STATUS        ) /* IPU Status Register */
+#define IPU_D_FMT	            (IPU_V_BASE + REG_D_FMT         ) /* Data Format Register */
+#define IPU_Y_ADDR	            (IPU_V_BASE + REG_Y_ADDR        ) /* Input Y or YUV422 Packaged Data Address Register */
+#define IPU_U_ADDR	            (IPU_V_BASE + REG_U_ADDR        ) /* Input U Data Address Register */
+#define IPU_V_ADDR	            (IPU_V_BASE + REG_V_ADDR        ) /* Input V Data Address Register */
+#define IPU_IN_FM_GS	        (IPU_V_BASE + REG_IN_FM_GS      ) /* Input Geometric Size Register */
+#define IPU_Y_STRIDE	        (IPU_V_BASE + REG_Y_STRIDE      ) /* Input Y Data Line Stride Register */
+#define IPU_UV_STRIDE	        (IPU_V_BASE + REG_UV_STRIDE     ) /* Input UV Data Line Stride Register */
+#define IPU_OUT_ADDR	        (IPU_V_BASE + REG_OUT_ADDR      ) /* Output Frame Start Address Register */
+#define IPU_OUT_GS	            (IPU_V_BASE + REG_OUT_GS        ) /* Output Geometric Size Register */
+#define IPU_OUT_STRIDE	        (IPU_V_BASE + REG_OUT_STRIDE    ) /* Output Data Line Stride Register */
+#define IPU_RSZ_COEF_INDEX      (IPU_V_BASE + REG_RSZ_COEF_INDEX) /* Resize Coefficients Table Index Register */
+#define IPU_CSC_C0_COEF	        (IPU_V_BASE + REG_CSC_CO_COEF   ) /* CSC C0 Coefficient Register */
+#define IPU_CSC_C1_COEF	        (IPU_V_BASE + REG_CSC_C1_COEF   ) /* CSC C1 Coefficient Register */
+#define IPU_CSC_C2_COEF         (IPU_V_BASE + REG_CSC_C2_COEF   ) /* CSC C2 Coefficient Register */
+#define IPU_CSC_C3_COEF         (IPU_V_BASE + REG_CSC_C3_COEF   ) /* CSC C3 Coefficient Register */
+#define IPU_CSC_C4_COEF         (IPU_V_BASE + REG_CSC_C4_COEF   ) /* CSC C4 Coefficient Register */
+#define IPU_HRSZ_LUT_BASE       (IPU_V_BASE + HRSZ_LUT_BASE     ) /* Horizontal Resize Coefficients Look Up Table Register group */
+#define IPU_VRSZ_LUT_BASE       (IPU_V_BASE + VRSZ_LUT_BASE     ) /* Virtical Resize Coefficients Look Up Table Register group */
+#define IPU_CSC_OFSET_PARA      (IPU_V_BASE + REG_CSC_OFSET_PARA) /* CSC Offset Parameter Register */
+#define IPU_Y_PHY_T_ADDR        (IPU_V_BASE + REG_Y_PHY_T_ADDR  ) /* Input Y Physical Table Address Register */
+#define IPU_U_PHY_T_ADDR        (IPU_V_BASE + REG_U_PHY_T_ADDR  ) /* Input U Physical Table Address Register */
+#define IPU_V_PHY_T_ADDR        (IPU_V_BASE + REG_V_PHY_T_ADDR  ) /* Input V Physical Table Address Register */
+#define IPU_OUT_PHY_T_ADDR      (IPU_V_BASE + REG_OUT_PHY_T_ADDR) /* Output Physical Table Address Register */
+#define IPU_ADDR_CTRL           (IPU_V_BASE + REG_ADDR_CTRL     )
+
+#define IPU_SRC_TLB_ADDR        IPU_Y_PHY_T_ADDR
+#define IPU_DEST_TLB_ADDR       IPU_U_PHY_T_ADDR
+
 // IPU Control Register
 #define BUS_OPT						( 1 << 22 ) //
 #define CONF_MOD					( 1 << 21 ) //
@@ -50,7 +81,7 @@
 #define PTS_READY                   (1 << 4)
 
 //no need more
-#define PTV_READY                   (1 << 6) 
+#define PTV_READY                   (1 << 6)
 #define PTU_READY                   (1 << 5)
 #define PTY_READY                   (1 << 4)
 
@@ -272,7 +303,7 @@ struct YuvStride
 	unsigned int out;
 };
 
-typedef struct 
+typedef struct
 //struct img_param_t
 {
 	unsigned int		ipu_ctrl;				// IPU Control Register
@@ -311,7 +342,7 @@ typedef volatile struct _IPU_CTRL2
 	/***wyang***/
 	unsigned int ipu_stop		:1;
 	unsigned int rsv0			:2;
-	
+
 	//unsigned int h_scale		:1;
 	//unsigned int v_scale		:1;
 	unsigned int spkg_sel		:1;
@@ -369,7 +400,7 @@ int ipu_ioctl(void *buff, unsigned int cmd);
 typedef struct {
 	int width_up, height_up, width_resize_enable, height_resize_enable;
 	int width_lut_size, height_lut_size;
-	int outW, outH, Wsel, Hsel; 
+	int outW, outH, Wsel, Hsel;
 	unsigned int width_lut_coef [IPU_LUT_LEN];
 	unsigned int height_lut_coef [IPU_LUT_LEN];
 	unsigned int width_bicube_lut_coef	[IPU_LUT_LEN * 2];
@@ -378,7 +409,7 @@ typedef struct {
 
 
 typedef struct {
-	int rsize_algorithm;  
+	int rsize_algorithm;
 	float rsize_bicube_level;
 	IPU_rsize_para resize_para;
 }JZ47_IPU_MOD;

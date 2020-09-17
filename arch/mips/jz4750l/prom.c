@@ -179,8 +179,8 @@ void __init prom_init(void)
 /* used by early printk */
 void prom_putchar(char c)
 {
-	volatile u8 *uart_lsr = (volatile u8 *)(UART1_BASE + OFF_LSR);
-	volatile u8 *uart_tdr = (volatile u8 *)(UART1_BASE + OFF_TDR);
+	volatile u8 *uart_lsr = (volatile u8 *)(UART_BASE + OFF_LSR);
+	volatile u8 *uart_tdr = (volatile u8 *)(UART_BASE + OFF_TDR);
 
 	/* Wait for fifo to shift out some bytes */
 	while ( !((*uart_lsr & (UARTLSR_TDRQ | UARTLSR_TEMT)) == 0x60) );

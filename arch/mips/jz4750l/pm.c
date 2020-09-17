@@ -1,7 +1,7 @@
 /*
- * linux/arch/mips/jz4750l/common/pm.c
+ * linux/arch/mips/jz4750d/common/pm.c
  * 
- * JZ4750L Power Management Routines
+ * JZ4750D Power Management Routines
  * 
  * Copyright (C) 2006 Ingenic Semiconductor Inc.
  * Author: <jlwei@ingenic.cn>
@@ -23,11 +23,11 @@
 
 #include <linux/init.h>
 #include <linux/pm.h>
-#include <linux/pm_legacy.h>
 #include <linux/sched.h>
 #include <linux/interrupt.h>
 #include <linux/proc_fs.h> 
 #include <linux/sysctl.h>
+#include <linux/suspend.h>
 
 #include <asm/cacheops.h>
 #include <asm/jzsoc.h>
@@ -40,7 +40,7 @@
 #define dprintk(x...)
 #endif
 
-#define GPIO_PORT_NUM   6
+#define GPIO_PORT_NUM   4
 
 /* 
  * __gpio_as_sleep set all pins to pull-disable, and set all pins as input
@@ -150,7 +150,7 @@ static void jz_board_do_sleep(unsigned long *ptr)
          * system to avoid chip select crashing with sdram when resuming from sleep mode.
          */
 
-#if defined(CONFIG_JZ4750L_APUS)
+#if defined(CONFIG_JZ4750D_APUS)
         /* GPB25/CS1_N is used as chip select for nand flash, shouldn't be change. */ 
 
         /* GPB26/CS2_N is connected to nand flash, needn't be changed. */
@@ -164,7 +164,7 @@ static void jz_board_do_sleep(unsigned long *ptr)
          * Enable pull for NC pins here according to your system 
 	 */
 
-#if defined(CONFIG_JZ4750L_APUS)
+#if defined(CONFIG_JZ4750D_APUS)
 #endif
 
 	/* 
@@ -174,7 +174,7 @@ static void jz_board_do_sleep(unsigned long *ptr)
          * __gpio_set_pin(n); or  __gpio_clear_pin(n);
 	 */
 
-#if defined(CONFIG_JZ4750L_APUS)
+#if defined(CONFIG_JZ4750D_APUS)
 	/* GPC7 which is used as AMPEN_N should be set to high to disable audio amplifier */
 	__gpio_as_output(32*2+7);
 	__gpio_set_pin(32*2+7);
@@ -242,11 +242,15 @@ static int jz_pm_do_sleep(void)
 	unsigned long imr = REG_INTC_IMR;
 	unsigned long sadc = REG_SADC_ENA;
 	unsigned long sleep_gpio_save[7*(GPIO_PORT_NUM-1)];
-
+	
+	unsigned long flags;
+	
 	printk("Put CPU into sleep mode.\n");
 
 	/* Preserve current time */
 	delta = xtime.tv_sec - REG_RTC_RSR;
+	
+	local_irq_save(flags);	
 
         /* Disable nand flash */
 	REG_EMC_NFCSR = ~0xff;
@@ -272,6 +276,7 @@ static int jz_pm_do_sleep(void)
 
 	/* enable RTC alarm */
 	__intc_unmask_irq(IRQ_RTC);
+
 #if 0
         /* make system wake up after n seconds by RTC alarm */
 	unsigned int v, n;
@@ -284,6 +289,10 @@ static int jz_pm_do_sleep(void)
  	v = __rtc_get_second();
  	while (!__rtc_write_ready());
  	__rtc_set_alarm_second(v+n);
+	while (!__rtc_write_ready());
+	REG_RTC_RCR &= (~0x10);
+	while (!__rtc_write_ready());
+	__rtc_enable_alarm_wakeup();
 #endif
 
 	/* WAKEUP key */
@@ -322,7 +331,9 @@ static int jz_pm_do_sleep(void)
 
 	/* Restore Oscillator and Power Control Register */
 	REG_CPM_OPCR = opcr;
-
+	
+	local_irq_restore(flags);
+	
 	/* Restore current time */
 	xtime.tv_sec = REG_RTC_RSR + delta;
 
@@ -335,125 +346,41 @@ int jz_pm_hibernate(void)
 	return jz_pm_do_hibernate();
 }
 
-#ifndef CONFIG_JZ_POWEROFF
-static irqreturn_t pm_irq_handler (int irq, void *dev_id)
-{
-	return IRQ_HANDLED;
-}
-#endif
-
 /* Put CPU to SLEEP mode */
 int jz_pm_sleep(void)
 {
-	int retval;
-
-#ifndef CONFIG_JZ_POWEROFF
-	if ((retval = request_irq (IRQ_GPIO_0 + GPIO_WAKEUP, pm_irq_handler, IRQF_DISABLED,
-				   "PM", NULL))) {
-		printk ("PM could not get IRQ for GPIO_WAKEUP\n");
-		return retval;
-	}
-#endif
-
-	pm_send_all(PM_SUSPEND, (void *)3);
-	retval = jz_pm_do_sleep();
-	pm_send_all(PM_RESUME, (void *)0);
-
-#ifndef CONFIG_JZ_POWEROFF
-	free_irq (IRQ_GPIO_0 + GPIO_WAKEUP, NULL);
-#endif
-
-	return retval;
+	return jz_pm_do_sleep();
 }
-
-#if 0
-/* Deprecated ,was used by dpm */
-void jz_pm_idle(void)
-{
-	local_irq_disable();
-	if (!need_resched()) {
-		local_irq_enable();
-		cpu_wait();
-	}
-}
-#endif
-
-
-#ifdef CONFIG_SYSCTL
 
 /*
- * Use a temporary sysctl number. Horrid, but will be cleaned up in 2.6
- * when all the PM interfaces exist nicely.
+ * valid states, only support mem(sleep)
  */
-#define CTL_PM_SUSPEND   1
-#define CTL_PM_HIBERNATE 2
+static int jz_pm_valid(suspend_state_t state)
+{
+	return state == PM_SUSPEND_MEM;
+}
 
-/*----------------------------------------------------------------------------
- * Power Management sleep sysctl proc interface
- *
- * A write to /proc/sys/pm/suspend invokes this function 
- * which initiates a sleep.
- *--------------------------------------------------------------------------*/
-static int sysctl_jz_pm_sleep(void)
+/*
+ * Jz CPU enter save power mode
+ */
+static int jz_pm_enter(suspend_state_t state)
 {
 	return jz_pm_sleep();
 }
 
-/*----------------------------------------------------------------------------
- * Power Management sleep sysctl proc interface
- *
- * A write to /proc/sys/pm/hibernate invokes this function 
- * which initiates a poweroff.
- *--------------------------------------------------------------------------*/
-static int sysctl_jz_pm_hibernate(void)
-{
-	return jz_pm_hibernate();
-}
-
-static struct ctl_table pm_table[] =
-{
-	{
-		.ctl_name	= CTL_UNNUMBERED,
-		.procname	= "suspend",
-		.data		= NULL,
-		.maxlen		= 0,
-		.mode		= 0600,
-		.proc_handler	= &sysctl_jz_pm_sleep,
-	},
-	{
-		.ctl_name	= CTL_UNNUMBERED,
-		.procname	= "hibernate",
-		.data		= NULL,
-		.maxlen		= 0,
-		.mode		= 0600,
-		.proc_handler	= &sysctl_jz_pm_hibernate,
-	},
-	{ .ctl_name = 0}
+static struct platform_suspend_ops jz_pm_ops = {
+	.valid		= jz_pm_valid,
+	.enter		= jz_pm_enter,
 };
-
-static struct ctl_table pm_dir_table[] =
-{
-	{
-		.ctl_name	= CTL_UNNUMBERED,
-		.procname	= "pm",
-		.mode		= 0555,
-		.child		= pm_table,
-	},
-	{ .ctl_name = 0}
-};
-
-#endif /* CONFIG_SYSCTL */
 
 /*
  * Initialize power interface
  */
-static int __init jz_pm_init(void)
+int __init jz_pm_init(void)
 {
-	printk("Power Management for JZ\n");
+	printk(JZ_SOC_NAME ": Power Management Interface Registered.\n");
 
-#ifdef CONFIG_SYSCTL
-	register_sysctl_table(pm_dir_table);
-#endif
+	suspend_set_ops(&jz_pm_ops);
 
 	return 0;
 }

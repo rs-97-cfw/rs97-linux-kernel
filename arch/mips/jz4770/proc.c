@@ -574,8 +574,11 @@ static int udc_read_proc(char *page, char **start, off_t off,
  * MMC/SD hotplug
  */
 
-#ifndef MSC_HOTPLUG_PIN
-#define MSC_HOTPLUG_PIN 90
+#ifndef MSC1_HOTPLUG_PIN
+
+//medive change
+//#define MSC1_HOTPLUG_PIN 90
+#define MSC1_HOTPLUG_PIN (32+2)
 #endif
 
 static int mmc_read_proc (char *page, char **start, off_t off,
@@ -583,7 +586,7 @@ static int mmc_read_proc (char *page, char **start, off_t off,
 {
         int len = 0;
 
-        if (__gpio_get_pin(MSC_HOTPLUG_PIN))
+        if (__gpio_get_pin(MSC1_HOTPLUG_PIN))
                 len += sprintf (page+len, "REMOVE\n");
         else
                 len += sprintf (page+len, "INSERT\n");

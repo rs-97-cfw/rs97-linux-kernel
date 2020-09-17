@@ -38,6 +38,8 @@ EXPORT_SYMBOL(is_virt_addr_valid);
 
 struct jz_mmc_controller controller[JZ_MAX_MSC_NUM];
 
+extern bool mmc_protected;
+
 /* add partitions info for recovery */
 #ifdef CONFIG_JZ_SYSTEM_AT_CARD
 static ssize_t jz_mmc_partitions_show(struct device *dev,struct device_attribute *attr, char *buf)
@@ -107,7 +109,7 @@ void jz_mmc_finish_request(struct jz_mmc_host *host, struct mmc_request *mrq)
 #ifdef CONFIG_JZ_SYSTEM_AT_CARD
 unsigned int get_addr_from_name(char *name, struct jz_mmc_platform_data *pdata){
 	int i;
-	
+
 	for(i=0; i < pdata->num_partitions; i++){
 		if(!strcmp(name, pdata->partitions[i].name))
 			return pdata->partitions[i].saddr;
@@ -132,10 +134,9 @@ int jz_mmc_get_permission(struct mmc_host *mmc, struct mmc_request *mrq)
 	}
 	sector = mrq->cmd->arg;
 
-	if(sector>down_limit && sector<up_limit){
-		int p = (pdata->permission == MMC_BOOT_AREA_PROTECTED) ? 0 : 1;
-		return p;
-	}else{
+	if (mmc_protected && sector > down_limit && sector < up_limit) {
+		return (pdata->permission != MMC_BOOT_AREA_PROTECTED);
+	} else {
 		return 1;
 	}
 }
@@ -516,8 +517,7 @@ static struct platform_driver jz_msc_driver = {
 
 static int __init jz_mmc_init(void)
 {
-	int ret = 0;
-
+	int ret;
 	ret = platform_driver_register(&jz_msc_driver);
 	return ret;
 }

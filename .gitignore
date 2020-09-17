@@ -1,3 +1,22 @@
+*.patch
+include/linux/autoconf.h
+include/config/auto.conf
+arch/mips/boot/vmlinux.bin.gz
+arch/mips/boot/uImage
+.config
+.config.old
+vmlinux
+System.map
+.tmp_kallsyms2.S
+.tmp_kallsyms1.o
+.tmp_kallsyms2.o
+.tmp_kallsyms1.S
+.tmp_vmlinux1
+.tmp_vmlinux2
+.tmp_System.map
+Module.symvers
+make.sh
+.scmversion
 
 # Created by https://www.gitignore.io/api/c,c++,linux
 # Edit at https://www.gitignore.io/?templates=c,c++,linux
@@ -22,7 +41,6 @@
 *.pch
 
 # Libraries
-*.lib
 *.a
 *.la
 *.lo
@@ -48,7 +66,6 @@
 *.pdb
 
 # Kernel Module Compile Results
-*.mod*
 *.cmd
 .tmp_versions/
 modules.order

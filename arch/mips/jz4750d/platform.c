@@ -19,7 +19,7 @@
 #include <linux/spi/spi.h>
 
 extern void __init board_msc_init(void);
-
+extern void __init board_i2c_init(void);
 int __init jz_add_msc_devices(unsigned int controller, struct jz_mmc_platform_data *plat);
 
 #if 0
@@ -167,6 +167,25 @@ static struct platform_device jz_msc0_device = {
 	.resource       = jz_msc0_resources,
 };
 
+/* CIM */    
+static struct resource jz_cim_resources[] = {    
+	[0] = {    
+		.start  = CPHYSADDR(CIM_BASE),    
+		.end    = CPHYSADDR(CIM_BASE) + 0x1000 - 1,    
+		.flags  = IORESOURCE_MEM,    
+	},    
+	[1] = {                                                                                                                              
+		.start  = IRQ_CIM,    
+		.end    = IRQ_CIM,    
+		.flags  = IORESOURCE_IRQ,    
+	},    
+};    
+static struct platform_device jz_cim_device = {                                                              
+	.name           = "jz_cim",    
+	.id             = 0,    
+	.num_resources  = ARRAY_SIZE(jz_cim_resources),    
+	.resource       = jz_cim_resources,    
+};
 /** MMC/SD controller MSC1**/
 static struct resource jz_msc1_resources[] = {
 	{
@@ -358,6 +377,7 @@ static struct platform_device *jz_platform_devices[] __initdata = {
 //	&jz_usb_ohci_device,
 	&jz_lcd_device,
 	&jz_usb_gdt_device,
+	&jz_cim_device,
 	//&jz_mmc_device,
 	&jz_i2c_device,
 	&vogue_snd_device,
@@ -366,6 +386,7 @@ static struct platform_device *jz_platform_devices[] __initdata = {
 extern void __init board_spi_init(void);
 static int __init jz_platform_init(void)
 {
+	board_i2c_init();
 	board_msc_init();
 	board_spi_init();
 	return platform_add_devices(jz_platform_devices, ARRAY_SIZE(jz_platform_devices));

@@ -115,45 +115,49 @@ EXPORT_SYMBOL(cpm_get_pllout1);
  */
 void cpm_start_clock(clock_gate_module module_name)
 {
-        unsigned int cgr_index, module_index;
+	unsigned int cgr_index, module_index;
 
-	if (module_name == CGM_ALL_MODULE) {
-	        OUTREG32(CPM_CLKGR0, 0x0);
-	        OUTREG32(CPM_CLKGR1, 0x0);
+	if (module_name == CGM_ALL_MODULE) 
+	{
+        OUTREG32(CPM_CLKGR0, 0x0);
+        OUTREG32(CPM_CLKGR1, 0x0);
 		return;
 	}
 
-        cgr_index = module_name / 32;
-        module_index = module_name % 32;
-        switch (cgr_index) {
-                case 0:
-                        CLRREG32(CPM_CLKGR0, 1 << module_index);
-			switch(module_index) {
-			case 3:
-				CLRREG32(CPM_MSC0CDR, MSCCDR_MCS);
-				CLRREG32(CPM_MSC0CDR, MSCCDR_MPCS);
-				break;
-			case 11:
-				CLRREG32(CPM_MSC1CDR, MSCCDR_MCS);
-				CLRREG32(CPM_MSC1CDR, MSCCDR_MPCS);
-				break;
-			case 12:
-				CLRREG32(CPM_MSC2CDR, MSCCDR_MCS);
-				CLRREG32(CPM_MSC2CDR, MSCCDR_MPCS);
-				break;
-			default:
-				;
+    cgr_index = module_name / 32;
+    module_index = module_name % 32;
+    switch (cgr_index)
+	{
+        case 0:
+        	CLRREG32(CPM_CLKGR0, 1 << module_index);
+			switch(module_index)
+			{
+				case 3:
+					CLRREG32(CPM_MSC0CDR, MSCCDR_MCS);
+					CLRREG32(CPM_MSC0CDR, MSCCDR_MPCS);
+					break;
+				case 11:
+					CLRREG32(CPM_MSC1CDR, MSCCDR_MCS);
+					CLRREG32(CPM_MSC1CDR, MSCCDR_MPCS);
+					break;
+				case 12:
+					CLRREG32(CPM_MSC2CDR, MSCCDR_MCS);
+					CLRREG32(CPM_MSC2CDR, MSCCDR_MPCS);
+					break;
+				default:
+					;
 			}
-                        break;
-                case 1:
-                        CLRREG32(CPM_CLKGR1, 1 << module_index);
-                        break;
-                default:
-                        printk("WARNING: can NOT start the %d's clock\n",
-                                        module_name);
-                        break;
-       }
+            break;
+        case 1:
+            CLRREG32(CPM_CLKGR1, 1 << module_index);
+            break;
+        default:
+            printk("WARNING: can NOT start the %d's clock\n",module_name);
+            break;
+   }
+		
 }
+
 EXPORT_SYMBOL(cpm_start_clock);
 
 /*

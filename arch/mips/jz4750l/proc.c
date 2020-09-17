@@ -852,6 +852,7 @@ static int __init jz_proc_init(void)
 		res->data = NULL;
 	}
 
+#ifdef CONFIG_RESERVE_MEMORY_FOR_IPU
 	/*
 	 * Reserve a 4MB memory for IPU on JZ4750L.
 	 */
@@ -878,6 +879,7 @@ static int __init jz_proc_init(void)
 		printk("Total %dMB memory at 0x%x was reserved for IPU\n", 
 		       (unsigned int)((1 << IMEM_MAX_ORDER) * PAGE_SIZE)/1000000, jz_imem_base);
 	}
+#endif
 
 	return 0;
 }

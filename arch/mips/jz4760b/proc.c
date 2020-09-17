@@ -34,6 +34,8 @@
 //#define DEBUG 1
 #undef DEBUG
 
+bool mmc_protected = true;
+
 extern void jz4760b_fpu_init(unsigned int round);
 
 struct proc_dir_entry *proc_jz_root;
@@ -199,6 +201,7 @@ static int cgm_write_proc(struct file *file, const char *buffer, unsigned long c
  * od -X /proc/jz/ipu 		// read mem addr
  */
 
+#if 0
 typedef struct _ipu_buf {
 	unsigned int addr;	/* phys addr */
 	unsigned int page_shift;
@@ -209,6 +212,7 @@ typedef struct _ipu_buf {
 static struct _ipu_buf ipu_buf[IPU_BUF_MAX];
 static int ipu_buf_cnt = 0;
 static unsigned char g_asid=0;
+#endif
 
 extern void local_flush_tlb_all(void);
 
@@ -259,6 +263,7 @@ void show_tlb(void)
 	local_irq_restore(flags);
 }
 
+#if 0
 static void ipu_add_wired_entry(unsigned long pid,
 				unsigned long entrylo0, unsigned long entrylo1,
 				unsigned long entryhi, unsigned long pagemask)
@@ -499,6 +504,7 @@ static int ipu_write_proc(struct file *file, const char *buffer, unsigned long c
 
 	return count;
 }
+#endif
 
 /*
  * UDC hotplug
@@ -558,7 +564,21 @@ static int mmc_read_proc (char *page, char **start, off_t off,
         return len;
 }
 
-#ifndef CONFIG_ANDROID_PMEM	/* /dev/pmem instead /proc/jz/imem on android platform */
+static int mmc_write_proc(struct file *file, const char *buffer, unsigned long count, void *data)
+{
+	mmc_protected = !!simple_strtol(buffer, 0, 10);
+
+	if (mmc_protected) {
+		printk("jz-msc: MMC_BOOT_AREA_PROTECTED\n");
+	} else {
+		printk("jz-msc: MMC_BOOT_AREA_OPENED\n");
+	}
+
+	return count;
+}
+
+#if 0 /* #ifndef CONFIG_ANDROID_PMEM */
+/* /dev/pmem instead /proc/jz/imem on android platform */
 
 /***********************************************************************
  * IPU memory management (used by mplayer and other apps)
@@ -595,7 +615,7 @@ typedef struct imem_list {
 static struct imem_list *imem_list_head = NULL; /* up sorted by phys_start */
 
 #define IMEM1_MAX_ORDER 12            /* max 2^12 * 4096 = 16MB */
-#if (IMEM1_MAX_ORDER==11) 
+#if (IMEM1_MAX_ORDER==11)
 #err
 #define ADD_IMEM2 //IMEM1_MAX_ORDER 16M--> 8+8
 #endif
@@ -819,7 +839,7 @@ static void imem_free(unsigned int phys_addr)
                 imemp = imem;
                 imem = imem->next;
         }
- 
+
  #ifdef ADD_IMEM2
         imem = imemp = imem2_list_head;
         while (imem) {
@@ -839,7 +859,7 @@ static void imem_free(unsigned int phys_addr)
                 imem = imem->next;
         }
  #endif
-	
+
 #ifdef DEBUG_IMEM
 	dump_imem_list();
 #endif
@@ -868,7 +888,7 @@ static void imem_free_all(void)
         imem1_list_head = NULL;
 
         allocated_phys_addr1 = 0;
-		
+
   #ifdef ADD_IMEM2
         imem = imem2_list_head;
         while (imem) {
@@ -880,7 +900,7 @@ static void imem_free_all(void)
 
         allocated_phys_addr2 = 0;
   #endif
-  
+
 #ifdef DEBUG_IMEM
 	dump_imem_list();
 #endif
@@ -992,7 +1012,7 @@ static int div_write_proc(struct file *file, const char *buffer, unsigned long c
                         ".set mips32\n\t"
                         :
                         : "I" (Index_Writeback_Inv_D_PRIV), "r"(addr));
-	
+
 	addr += 32;
 	asm volatile (
                         ".set mips32\n\t"
@@ -1000,7 +1020,7 @@ static int div_write_proc(struct file *file, const char *buffer, unsigned long c
                         ".set mips32\n\t"
                         :
                         : "I" (Index_Writeback_Inv_D_PRIV), "r"(addr));
-	
+
 	addr += 32;
 	asm volatile (
                         ".set mips32\n\t"
@@ -1037,7 +1057,7 @@ L1:
 	REG_CPM_CPPSR &= ~CPPSR_FS;
 	REG_CPM_CPPSR |= 1;
 	REG_CPM_CPCCR |= CPCCR_CE;
-	
+
 	do {
 		if (addr & 1)
 			goto L1;
@@ -1137,7 +1157,7 @@ static int imem1_write_proc(struct file *file, const char *buffer, unsigned long
 	} else if ((val >= 0) && (val <= IMEM1_MAX_ORDER)) {
 		/* allocate 2^val pages */
 		imem1_alloc(val);
-	} else {			
+	} else {
 		/* free buffer which phys_addr is val */
 		imem_free(val);
 	}
@@ -1285,7 +1305,8 @@ static int imem2_write_proc(struct file *file, const char *buffer, unsigned long
 	return count;
 }
 
-#endif	/* #ifndef CONFIG_ANDROID_PMEM */
+#endif
+#endif /* #ifndef CONFIG_ANDROID_PMEM */
 
 static int fpu_write_proc(struct file *file, const char *buffer, unsigned long count, void *data)
 {
@@ -1299,7 +1320,7 @@ static int fpu_write_proc(struct file *file, const char *buffer, unsigned long c
 	return count;
 }
 
-#endif
+// #endif
 
 /*
  * /proc/jz/xxx entry
@@ -1308,9 +1329,9 @@ static int fpu_write_proc(struct file *file, const char *buffer, unsigned long c
 static int __init jz_proc_init(void)
 {
 	struct proc_dir_entry *res;
-#ifndef CONFIG_ANDROID_PMEM
+#if 0 /* #ifndef CONFIG_ANDROID_PMEM */
 	unsigned int virt_addr, i;
-#endif
+#endif /* #ifndef CONFIG_ANDROID_PMEM */
 
 	proc_jz_root = proc_mkdir("jz", 0);
 
@@ -1330,6 +1351,7 @@ static int __init jz_proc_init(void)
 		res->data = NULL;
 	}
 
+#if 0
 	/* Image process unit */
 	res = create_proc_entry("ipu", 0644, proc_jz_root);
 	if (res) {
@@ -1337,12 +1359,15 @@ static int __init jz_proc_init(void)
 		res->write_proc = ipu_write_proc;
 		res->data = NULL;
 	}
+#endif
 
+#if 0 /* #ifndef CONFIG_ANDROID_PMEM */
 	res = create_proc_entry("div", 0644, proc_jz_root);
 	if (res) {
 		res->write_proc = div_write_proc;
 		res->data = NULL;
 	}
+#endif /* #ifndef CONFIG_ANDROID_PMEM */
 
 	/* udc hotplug */
 	res = create_proc_entry("udc", 0644, proc_jz_root);
@@ -1356,7 +1381,7 @@ static int __init jz_proc_init(void)
 	res = create_proc_entry("mmc", 0644, proc_jz_root);
 	if (res) {
 		res->read_proc = mmc_read_proc;
-		res->write_proc = NULL;
+		res->write_proc = mmc_write_proc;
 		res->data = NULL;
 	}
 
@@ -1368,8 +1393,7 @@ static int __init jz_proc_init(void)
 		res->data = NULL;
 	}
 
-//#ifndef CONFIG_ANDROID_PMEM
-#if 1
+#if 0 /* #ifndef CONFIG_ANDROID_PMEM */
 	/*
 	 * Reserve a 16MB memory for IPU on JZ4760B.
 	 */
@@ -1452,7 +1476,7 @@ static int __init jz_proc_init(void)
         else
            printk("NOT enough memory for imem2\n");
  #endif
-#endif	/* #ifdef CONFIG_ANDROID_PMEM */
+#endif /* #ifdef CONFIG_ANDROID_PMEM */
 
 	/* fpu */
 	res = create_proc_entry("fpu", 0644, proc_jz_root);
@@ -1461,7 +1485,7 @@ static int __init jz_proc_init(void)
 		res->write_proc = fpu_write_proc;
 		res->data = NULL;
 	}
-	
+
 	return 0;
 }
 

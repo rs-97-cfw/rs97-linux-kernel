@@ -167,7 +167,7 @@ static int partition_reserved_badblocks[] = {
 };				/* reserved blocks of mtd5 */
 #endif				/* CONFIG_JZ4750_FUWA */
 
-#if defined(CONFIG_JZ4750_APUS) || defined(CONFIG_JZ4750D_CETUS)
+#if defined(CONFIG_JZ4750_APUS) || defined(CONFIG_JZ4750D_CETUS) || defined(CONFIG_JZ4750L_TAURUS)
 struct mtd_partition partition_info[] = {
 	{name:"NAND BOOT partition",
 	 offset:0 * 0x100000LL,
@@ -1421,7 +1421,8 @@ static int jz4750_nand_dma_init(struct mtd_info *mtd)
 	next = (CPHYSADDR((u32)dma_desc_nand_ddr) + sizeof(jz_dma_desc_8word)) >> 4;
 	desc->dcmd = DMAC_DCMD_RDIL_IGN | DMAC_DCMD_SWDH_32 | DMAC_DCMD_DWDH_32 | DMAC_DCMD_DS_32BIT | DMAC_DCMD_LINK;
 	desc->dsadr = CPHYSADDR((u32)pval_nand_ddr);	/* DMA source address */
-	desc->dtadr = CPHYSADDR(DMAC_DMADBSR(nand_dma_chan / HALF_DMA_NUM));	/* nand_dma_chan's descriptor addres register */
+	//desc->dtadr = CPHYSADDR(DMAC_DMADBSR(nand_dma_chan / HALF_DMA_NUM));	/* nand_dma_chan's descriptor addres register */
+	desc->dtadr = CPHYSADDR(DMAC_DCCSR(nand_dma_chan / HALF_DMA_NUM));	/* nand_dma_chan's descriptor addres register */
 	desc->ddadr = (next << 24) + 1;	/* size: 1 word */
 	desc->dreqt = DMAC_DRSR_RS_AUTO;
 	dprintk("*pval_nand_ddr=0x%x\n", *pval_nand_ddr);
@@ -1550,7 +1551,8 @@ static int jz4750_nand_dma_init(struct mtd_info *mtd)
 	next = (CPHYSADDR((u32)dma_desc_bch_ddr) + sizeof(jz_dma_desc_8word)) >> 4;
 	desc->dcmd = DMAC_DCMD_RDIL_IGN | DMAC_DCMD_SWDH_32 | DMAC_DCMD_DWDH_32 | DMAC_DCMD_DS_32BIT | DMAC_DCMD_LINK;
 	desc->dsadr = CPHYSADDR((u32)pval_bch_ddr);	/* DMA source address */
-	desc->dtadr = CPHYSADDR(DMAC_DMADBSR(0));	/* channel 1's descriptor addres register */
+	//desc->dtadr = CPHYSADDR(DMAC_DMADBSR(0));	/* channel 1's descriptor addres register */
+	desc->dtadr = CPHYSADDR(DMAC_DCCSR(0));	/* channel 1's descriptor addres register */
 	desc->ddadr = (next << 24) + 1;	/* size: 1 word */
 	desc->dreqt = DMAC_DRSR_RS_AUTO;
 

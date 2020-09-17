@@ -8,11 +8,11 @@ targets		:= zImage vmlinuz vmlinux.bin.gz head.o misc.o piggy.o dummy.o
 
 OBJS 		:= $(obj)/head.o $(obj)/misc.o
 
-LD_ARGS 	:= -EL -T $(obj)/ld.script -Ttext 0x80600000 -Bstatic
+LD_ARGS 	:= -EL -T $(CURDIR)/$(obj)/ld.script -Ttext 0x80600000 -Bstatic
 OBJCOPY_ARGS 	:= -O elf32-tradlittlemips
 
-ENTRY 		:= $(obj)/../tools/entry
-FILESIZE 	:= $(obj)/../tools/filesize
+ENTRY 		:= $(CURDIR)/$(obj)/../tools/entry
+FILESIZE 	:= $(CURDIR)/$(obj)/../tools/filesize
 
 drop-sections	= .reginfo .mdebug .comment .note .pdr .options .MIPS.options
 strip-flags	= $(addprefix --remove-section=,$(drop-sections))
@@ -39,4 +39,4 @@ $(obj)/vmlinuz: $(OBJS) $(obj)/ld.script $(obj)/vmlinux.bin.gz $(obj)/dummy.o
 	$(OBJCOPY) $(OBJCOPY_ARGS) $@ $@ -R .comment -R .stab -R .stabstr -R .initrd -R .sysmap
 
 zImage: $(obj)/vmlinuz
-	$(OBJCOPY) -O binary $(obj)/vmlinuz $(obj)/zImage	
+	$(OBJCOPY) -O binary $(obj)/vmlinuz $(obj)/zImage

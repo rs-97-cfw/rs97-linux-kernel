@@ -2628,7 +2628,7 @@ void jz4760b_i2s_set_external_codec(void)
 	__gpio_as_func0(HP_POWER_EN);
 	__gpio_as_output(HP_POWER_EN);
 	__gpio_clear_pin(HP_POWER_EN);
-	
+
 #endif
 
 	codec_ioctrl(g_internal_codec, CODEC_SET_REPLAY_VOLUME, 0);
@@ -2646,10 +2646,10 @@ void jz4760b_i2s_set_internal_codec(void)
 	__i2s_internal_codec();
 	__i2s_enable();
 
-	//medive change 
+	//medive change
 	val = g_internal_codec->audio_volume;
 	printk("set internal codec cur volume  is  %d\n",val);
-	
+
 #ifdef  HP_POWER_EN
 	__gpio_as_func0(HP_POWER_EN);
 	__gpio_as_output(HP_POWER_EN);
@@ -3187,6 +3187,9 @@ static int jz_i2s_resume(struct platform_device *pdev)
 	}
 	return 0;
 }
+#else
+	#define jz_i2s_suspend NULL
+	#define jz_i2s_resume NULL
 #endif /* CONFIG_PM */
 
 static int __init probe_jz_i2s(struct jz_i2s_controller_info **controller)

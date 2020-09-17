@@ -24,6 +24,7 @@ obj-y				+= eeprom/
 obj-y				+= cb710/
 
 obj-$(CONFIG_JZ_CIM)            += jz_cim/
+obj-$(CONFIG_JZ_SPI_NOR)	+= jz_spi_nor/
 obj-$(CONFIG_JZ_OPT)		+= opt_test.o
 obj-$(CONFIG_JZ_EFUSE)		+= jz4770_efuse.o
 obj-$(CONFIG_JZ_I2C_SIMULATE)   += i2c_simulate.o

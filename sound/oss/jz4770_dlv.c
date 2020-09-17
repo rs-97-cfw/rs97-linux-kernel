@@ -35,10 +35,10 @@
 #include "jz4770_dlv.h"
 #include "jz_i2s_dbg.h"
 
+static void dlv_set_line(int val);
+
 // Hanvon
 //static int spk_state;//add by wll
-
-#define LM4890_SHUTDOWN_PIN	GPA(17)
 
 //#define ANTI_POP_TIMER
 #define ANTI_POP_WORK_STRUCT
@@ -163,12 +163,12 @@ static unsigned int g_volumes[SND_DEVICE_COUNT];
 
 /* Audio route ops */
 static void dlv_anti_pop_part(void);
-static void dlv_enable_hp_out(void);
-static void dlv_disable_hp_out(void);
+ void dlv_enable_hp_out(void);
+ void dlv_disable_hp_out(void);
 static void dlv_enable_receiver(void);
 static void dlv_disable_receiver(void);
-static void dlv_enable_line_out(void);
-static void dlv_disable_line_out(void);
+ void dlv_enable_line_out(void);
+ void dlv_disable_line_out(void);
 static void dlv_enable_line_in_record(int insel);
 static void dlv_set_line_in(void);
 static void dlv_disable_line_in_record(void);
@@ -400,6 +400,7 @@ static void dlv_shutdown(void) {
 	msleep(1);
 	//__i2s_disable_replay();
 	turn_off_sb_hp();
+	__dlv_switch_sb_line_out(POWER_OFF);
 	mdelay(1);
 	__dlv_enable_hp_mute();
  	mdelay(1);
@@ -703,6 +704,8 @@ static void dlv_anti_pop_part(void)
 	mdelay(1);
 
 	turn_on_sb_hp();
+	__dlv_switch_sb_line_out(POWER_ON);
+
 	mdelay(1);
 }
 
@@ -941,15 +944,21 @@ static void dlv_set_voice_volume(int vol)
 	__dlv_set_line_in_bypass_volume(vol);
 }
 
-static void dlv_set_replay_volume(int val)
+
+static int is_first_set_volume = 1;
+extern unsigned int l009_globle_volume;
+ 
+void dlv_set_replay_volume(int val)
 {
+#if 0
 	unsigned long fixed_vol;
 
 	ENTER();
 
-	/* Set it forcely
-	 * val = 95;
-	 */
+	if (val < 0)
+		val = 0;
+	if (val > 100)
+		val = 100;
 
 	//fixed_vol = 6 +  (25 * (100 - val) / 100);
 	fixed_vol = 31 * (100 - val) / 100;
@@ -973,7 +982,26 @@ static void dlv_set_replay_volume(int val)
 		     val, dlv_read_reg(DLV_REG_GCR1));
 
 	LEAVE();
+#else
+	unsigned int dac_gain;
+
+
+	//dac_gain = 6 + (25 * (100 - val) / 100);
+	dac_gain = 0 + (31 * (100 - val) / 100);
+	__dlv_set_hp_volume(0x6);
+	__dlv_set_dac_gain(dac_gain);
+	__dlv_set_line_in_bypass_volume(dac_gain);
+	if (val == 0) {
+		dlv_mute(1);
+	} else {
+		dlv_mute(0);
+	}
+
+
+
+#endif
 }
+EXPORT_SYMBOL(dlv_set_replay_volume);
 
 static void dlv_set_mic_volume(int val)
 {
@@ -1002,30 +1030,35 @@ static void dlv_set_mic_volume(int val)
  * Enable HP OUT replay mode
  *
  */
-static void dlv_enable_hp_out(void)
+ void dlv_enable_hp_out(void)
 {
 	//__dlv_enable_nomad();
+#if 0  //old
 	__dlv_disable_dac_left_only();
 	__dlv_hp_dac_to_lr();
 	__dlv_disable_li_for_bypass();
 	__dlv_switch_sb_line_out(POWER_OFF);
+#esle  //for fm no sound
+    __dlv_disable_hp_mute();
+#endif
 	mdelay(1);
 }
+EXPORT_SYMBOL(dlv_enable_hp_out);
 
 /**
  * Disable HP OUT replay mode
  *
  */
-static void dlv_disable_hp_out(void)
+ void dlv_disable_hp_out(void)
 {
 	//turn_off_sb_hp();
 	__dlv_enable_hp_mute();
 	//turn_off_dac(5);
-	//__dlv_switch_sb_dac(POWER_ON);
 	mdelay(10);
 }
+EXPORT_SYMBOL(dlv_disable_hp_out);
 
-static void dlv_enable_line_out(void);
+ void dlv_enable_line_out(void);
 
 /**
  * Enable RECEIVER replay mode
@@ -1033,30 +1066,73 @@ static void dlv_enable_line_out(void);
  */
 static void dlv_enable_receiver(void)
 {
-//	__dlv_set_16ohm_load();
-//	__dlv_set_10kohm_load();
 
+	//old
+#if 0
 	dlv_enable_hp_out();
+#else
+	//change for fm no sound
+	__dlv_disable_li_for_bypass();
+	__dlv_disable_dac_left_only();
+	__dlv_hp_dac_to_lr();
+	__dlv_lineout_from_dac();
+#endif
 
-	//dlv_enable_line_out();
 }
 
 /* for sorting test */
-static void dlv_set_replay_record(unsigned int input_src) {
+static void dlv_set_replay_record(unsigned int input_src, int bypass) {
 	if (input_src == USE_MIC) {
+		//old
+#if 0
 		dlv_disable_mic_2();
 		dlv_disable_line_in_record();
 		dlv_disable_hp_out();
 
 		dlv_enable_mic_2();
 		dlv_enable_hp_out();
+#else
+		//change for fm no sound
+		dlv_disable_mic_2();
+		dlv_disable_line_in_record();
+		__dlv_disable_li_for_bypass();
+		__dlv_disable_dac_left_only();
+		__dlv_hp_dac_to_lr();
+		__dlv_lineout_from_dac();
+
+		dlv_enable_mic_2();
+
+#endif
 	} else if (input_src == USE_LINEIN) {	      /* linein */
+		//old
+#if 0
 		dlv_disable_mic_1();
 		dlv_disable_mic_2();
 		dlv_disable_line_out();
 
 		dlv_enable_line_in_record(0);
 		dlv_enable_hp_out();
+
+		__dlv_hp_linein_to_lr();
+		__dlv_enable_li_for_bypass();
+		dlv_set_line(100);
+
+		__dlv_disable_hp_mute();
+		turn_on_dac(5);
+#else
+		//change for fm no sound
+		dlv_disable_mic_1();
+		dlv_disable_mic_2();
+
+		__dlv_enable_li_for_bypass();
+		dlv_set_line(100);
+
+
+		__dlv_hp_linein_to_lr();
+		__dlv_lineout_from_bypass();
+
+
+#endif
 	}
 }
 
@@ -1074,25 +1150,44 @@ static void dlv_disable_receiver(void)
  * Enable LINE OUT replay mode
  *
  */
-static void dlv_enable_line_out(void)
+ void dlv_enable_line_out(void)
 {
 
-	__gpio_as_output1(LM4890_SHUTDOWN_PIN);
 
+	//old
+#if 0
 	__dlv_switch_sb_line_out(POWER_ON);
 	__dlv_disable_lineout_mute();
 	__dlv_lineout_from_dac();
+#else
+	//chnage for fm no sound
+	__dlv_disable_lineout_mute();
+#endif
 }
+EXPORT_SYMBOL(dlv_enable_line_out);
+
 
 /**
  * Disable LINE OUT replay mode
  *
  */
-static void dlv_disable_line_out(void)
+ void dlv_disable_line_out(void)
 {
-	__gpio_as_output0(LM4890_SHUTDOWN_PIN);
-	//DUMP_CODEC_REGS("after dlv_disable_line_out\n");
+	//old
+#if 0
+	__dlv_switch_sb_line_out(POWER_OFF);
+#else
+	//change for fm no sound
+	__dlv_enable_lineout_mute();
+#endif
 }
+EXPORT_SYMBOL(dlv_disable_line_out);
+ void dlv_disable_hp_mute(void)
+{
+	__dlv_disable_hp_mute();
+}
+EXPORT_SYMBOL(dlv_disable_hp_mute);
+
 
 static void dlv_set_line(int val)
 {
@@ -1342,7 +1437,8 @@ static void dlv_enable_mic_1(void)
 #endif
 #endif
 
-	__dlv_set_mic1_boost(0x0);
+	//__dlv_set_mic1_boost(0x0);
+	__dlv_set_mic1_boost(0x5);
 	__dlv_set_adc_gain(0x0);
 
 	__dlv_enable_mic1();
@@ -1367,6 +1463,7 @@ static void dlv_disable_mic_1(void)
 	__dlv_disable_adc();
 	mdelay(2);
 	__dlv_disable_mic1();
+	//DUMP_CODEC_REGS("leave dlv_disable_mic_1\n");
 }
 
 #ifdef CONFIG_JZ4760_PT701
@@ -1508,8 +1605,8 @@ static void dlv_reset(void)
 	__dlv_adc_i2s_mode();
 	__dlv_set_dac_lrswap();
 	__dlv_enable_adc_lrswap();
-	__dlv_set_cap_less();
-	//__dlv_set_cap_couple();
+	//__dlv_set_cap_less();
+	__dlv_set_cap_couple();
 
 	/* default settings */
 	__dlv_hp_dac_to_lr(); /* a little pop click if select DAC in this step */
@@ -1598,7 +1695,7 @@ static int jzdlv_ioctl(void *context, unsigned int cmd, unsigned long arg)
 		break;
 
 	case CODEC_SET_REPLAY_RECORD:
-		dlv_set_replay_record(arg);
+		dlv_set_replay_record(arg, 1);
 		break;
 
 	case CODEC_SET_REPLAY_VOLUME:

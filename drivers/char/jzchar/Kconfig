@@ -31,7 +31,7 @@ config JZ_TPANEL_ATA2508
 choice
 	prompt "Touch Panel ADC type"
 	depends on JZ_TPANEL
-	default JZ_SADC if SOC_JZ4740 || SOC_JZ4750 || SOC_JZ4750D
+	default JZ_SADC if SOC_JZ4740 || SOC_JZ4750 || SOC_JZ4750D || SOC_JZ4750L
 	default JZ_TPANEL_AK4182 if SOC_JZ4730
 
 config JZ_SADC
@@ -54,7 +54,7 @@ config JZ_OW
 
 config JZ_TCSM
 	tristate 'JZ TCSM support' 
-	depends on JZCHAR && (SOC_JZ4750 || SOC_JZ4750D || SOC_JZ4760 || SOC_JZ4760B || SOC_JZ4770 || SOC_JZ4810)
+	depends on JZCHAR && (SOC_JZ4750 || SOC_JZ4750D || SOC_JZ4750L || SOC_JZ4760 || SOC_JZ4760B || SOC_JZ4770 || SOC_JZ4810)
 
 config JZ4770_TCU
 	tristate 'Ingenic JZ4770 TCU Driver'

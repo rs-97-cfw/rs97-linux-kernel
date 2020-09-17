@@ -234,23 +234,40 @@ config SPI_JZ47XX
 	select SPI_BITBANG
 	help
 	  SPI driver for Ingenic JZ47XX series SoCs
+
 config JZ_SPI0
-    bool "Ingenic SoC SSI controller 0 for SPI Host driver"
-    depends on SPI_JZ47XX
+	bool "Ingenic SoC SSI controller 0 for SPI Host driver"
+	depends on SPI_JZ47XX
+
+config SPI0_USE_DMA
+	bool 'Enable DMA on SSI controller 0'
+	depends on JZ_SPI0
+	default n
+	help
+	   All data is copied between memory and FIFO can by the DMA.
+           Do not select 'y' here unless DMA support for your SOC or board
+           is unavailable (or unstable).
 
 config JZ_SPI1
-    bool "Ingenic SoC SSI controller 1 for SPI Host driver"
-    depends on SPI_JZ47XX
+	bool "Ingenic SoC SSI controller 1 for SPI Host driver"
+	depends on SPI_JZ47XX
 
 config JZ_SPI_BOARD_INFO_REGISTER
-    bool "Board info associated by spi master"
-    depends on SPI_JZ47XX
-    default n
+	bool "Board info associated by spi master"
+	depends on SPI_JZ47XX
+	default n
+
+config JZ_SPI_PIO_CE
+	bool "Use GPIO CE on JZ SSI controller"
+	depends on SPI_JZ47XX
+	default n
+	help
+	 Use GPIO control SSI CE by CPU. Sometimes controller's CE NOT match SPI Protocal
 
 config JZ_SPIDEV_TEST
-    tristate "Ingenic spi test driver"
-    depends on SPI_JZ47XX
-    default n
+	tristate "Ingenic spi test driver"
+	depends on SPI_JZ47XX
+	default n
 
 #
 # Add new SPI master controllers in alphabetical order above this line

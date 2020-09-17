@@ -218,11 +218,6 @@
 /***************************************************************************
  * UART
  ***************************************************************************/
-#define __jtag_as_uart3()			\
-do {	                    			\
-	REG_GPIO_PXSELC(0) = 0x40000000;	\
-	REG_GPIO_PXSELS(0) = 0x80000000;	\
-} while(0)
 
 #define __uart_enable(n) \
   ( REG8(UART_BASE + UART_OFF*(n) + OFF_FCR) |= UARTFCR_UUE | UARTFCR_FE )

@@ -8,7 +8,7 @@ obj-y += prom.o irq.o time.o reset.o setup.o dma.o \
 	platform.o i2c.o
 
 obj-$(CONFIG_PROC_FS)		+= proc.o
-
+obj-$(CONFIG_GPIOLIB)		+= gpiolib.o
 # board specific support
 
 obj-$(CONFIG_JZ4750D_FUWA1)	+= board-fuwa1.o

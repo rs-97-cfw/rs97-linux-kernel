@@ -46,8 +46,13 @@
 
 #define NR_I2S				2
 
+#if 1
 #define JZCODEC_RW_BUFFER_SIZE		1
 #define JZCODEC_RW_BUFFER_TOTAL		8
+#else
+#define JZCODEC_RW_BUFFER_SIZE		2
+#define JZCODEC_RW_BUFFER_TOTAL		16
+#endif
 
 #define AUDIOBUF_STATE_FREE		0
 
@@ -187,6 +192,9 @@ static int g_play_first = 0;
 int audio_device_open = 0;
 volatile int audio_device_pm_state = 0;
 #endif
+
+unsigned int l009_globle_volume = 0;
+static int last_val = 0;
 
 /*
  * Debug functions
@@ -359,6 +367,86 @@ void dump_list(audio_head *head)
 	printk("--------\n");
 }
 #endif
+
+#define codec_ioctrl(codec, cmd, args) ({			\
+	int result;						\
+	down(&(codec)->i2s_sem);				\
+	result = (codec)->codecs_ioctrl((codec), (cmd), (args));\
+	up(&(codec)->i2s_sem);					\
+	result;							\
+})
+
+//-----------------------------------------------------------------
+//  external
+//-----------------------------------------------------------------
+static int is_external_codec = 0;
+static struct i2s_codec *g_internal_codec;
+void jz4770_set_is_external_codec(int i)
+{
+	is_external_codec = i;
+}
+
+void jz4770_i2s_set_external_codec(void)
+{
+	printk("i2s set external codec!\n");
+        is_external_codec = 1;
+	  	__i2s_external_codec();
+		__i2s_as_master();
+		__i2s_enable();
+
+		//medive change 
+#if 1
+      //  __gpio_clear_pin(GPIO_HP_OFF);
+        __gpio_clear_pin(GPIO_AMPEN);
+
+		last_val = 0;
+		l009_globle_volume = 0;
+#endif
+		//end
+
+		codec_ioctrl(g_internal_codec, CODEC_SET_REPLAY_VOLUME, 0);
+	printk("go out i2s set external codec!\n");
+
+}
+
+void jz4770_i2s_set_internal_codec(void)
+{
+	printk("i2s set internal codec!\n");
+        int val;
+        is_external_codec = 0;
+		__i2s_as_slave();
+		__i2s_internal_codec();
+		__i2s_enable();
+
+		//medive change 
+        val = g_internal_codec->audio_volume;
+#if 1
+		if (val == 0){
+		//	__gpio_clear_pin(GPIO_HP_OFF);
+			__gpio_clear_pin(GPIO_AMPEN);
+		}else if (val > 0 ){
+			__gpio_as_input(GPIO_HP_PIN);
+			__gpio_disable_pull(GPIO_HP_PIN);
+			udelay(10);
+			if (__gpio_get_pin(GPIO_HP_PIN)){
+				__gpio_set_pin(GPIO_AMPEN);
+			}
+		//	__gpio_clear_pin(GPIO_HP_OFF);
+		}
+		//last_val = val;
+		l009_globle_volume = val;
+#endif
+		//end
+
+		codec_ioctrl(g_internal_codec, CODEC_SET_REPLAY_VOLUME, val);
+	printk("go out i2s set internal codec!\n");
+
+}
+
+EXPORT_SYMBOL(jz4770_i2s_set_external_codec);
+EXPORT_SYMBOL(jz4770_set_is_external_codec);
+EXPORT_SYMBOL(jz4770_i2s_set_internal_codec);
+
 
 //----------------------------------------------------------------
 // audio node operater
@@ -872,7 +960,7 @@ static inline void set_controller_triger(struct jz_i2s_controller_info *controll
 
 	ENTER();
 
-//	printk("%%%% format = %d\n", format);
+	DPRINT("%%%% format = %d\n", format);
 
 	switch (format) {
 	case AFMT_U8:
@@ -1289,14 +1377,6 @@ void register_jz_codecs(void *func)
 	LEAVE();
 }
 
-#define codec_ioctrl(codec, cmd, args) ({			\
-	int result;						\
-	down(&(codec)->i2s_sem);				\
-	result = (codec)->codecs_ioctrl((codec), (cmd), (args));\
-	up(&(codec)->i2s_sem);					\
-	result;							\
-})
-
 static int jz_i2s_open_mixdev(struct inode *inode, struct file *file)
 {
 	int i;
@@ -1463,9 +1543,34 @@ static int jz_i2s_ioctl_mixdev(struct inode *inode, struct file *file, unsigned 
 		}
 
 		DPRINT_IOC("SOUND_MIXER_WRITE_VOLUME <- %lu\n", val);
+		
+
 
 		codec->audio_volume = val;
-		codec_ioctrl(codec, CODEC_SET_REPLAY_VOLUME, val);
+
+		printk("mixer set volume,is external codec %d\n",is_external_codec);
+		if(!is_external_codec){
+			//medive change 
+			l009_globle_volume = val;
+#if 1
+			if (val == 0){
+				__gpio_clear_pin(GPIO_HP_OFF);
+				__gpio_clear_pin(GPIO_AMPEN);
+			}else if (val > 0 && last_val == 0){
+				__gpio_as_input(GPIO_HP_PIN);
+				__gpio_disable_pull(GPIO_HP_PIN);
+				udelay(10);
+				if (__gpio_get_pin(GPIO_HP_PIN)){
+					__gpio_set_pin(GPIO_AMPEN);
+				}
+				__gpio_clear_pin(GPIO_HP_OFF);
+			}
+			last_val = val;
+#endif
+			//end
+
+            codec_ioctrl(codec, CODEC_SET_REPLAY_VOLUME, val);
+        }
 		return 0;
 
 	case SOUND_MIXER_READ_VOLUME:
@@ -1617,6 +1722,7 @@ static int __init jz_i2s_codec_init(struct jz_i2s_controller_info *controller)
 
 	}
 	controller->i2s_codec = &the_codecs[0];
+    g_internal_codec = &the_codecs[0];
 
 	LEAVE();
 	return i;
@@ -1928,12 +2034,12 @@ static inline int endpoint_set_filter(audio_pipe *endpoint, int format, int chan
 	switch (format) {
 	case AFMT_U8:
 		if (endpoint == &in_endpoint) {
-			if (channels == 1) {
-				endpoint->filter = convert_8bits_stereo2mono;
+			if (channels == 2) {
+				endpoint->filter = convert_8bits_stereo2mono_signed2unsigned;
 				DPRINT("$$$$ set pin_endpoint->filter = convert_8bits_stereo_2_mono\n");
 			} else {
-				endpoint->filter = NULL;
-				DPRINT("$$$$ set pin_endpoint->filter = NULL\n");
+				endpoint->filter = convert_8bits_signed2unsigned;
+				DPRINT("$$$$ set pin_endpoint->filter = convert_8bits_signed2unsigned\n");
 			}
 		}
 		break;
@@ -2272,6 +2378,42 @@ static int jz_audio_open(struct inode *inode, struct file *file)
 	return 0;
 }
 
+static struct file fm_file;
+int jz_audio_open_for_fm(void) {
+	struct i2s_codec *codec = &(the_codecs[0]);
+
+	memset(&fm_file, 0, sizeof(struct file));
+
+	fm_file.f_mode = FMODE_WRITE | FMODE_READ;
+
+	codec->use_mic_line_flag = USE_LINEIN;
+	jz_audio_open(NULL, &fm_file);
+
+	jz_codec_set_channels(codec, 2, fm_file.f_mode);
+	jz_codec_set_format(codec, 16, fm_file.f_mode);
+	jz_codec_set_speed(codec, 44100, fm_file.f_mode);
+
+	{
+		struct jz_i2s_controller_info *controller =
+			(struct jz_i2s_controller_info *) fm_file.private_data;
+		audio_pipe	*pin_endpoint = controller->pin_endpoint;
+		audio_pipe	*pout_endpoint = controller->pout_endpoint;
+
+		endpoint_set_filter(pin_endpoint, AFMT_S16_LE, 2);
+		set_controller_triger(controller, pin_endpoint,
+				      codec->record_codec_channel, codec->record_format);
+
+		set_controller_triger(controller, pout_endpoint,
+				      codec->replay_codec_channel, codec->replay_format);
+	}
+}
+EXPORT_SYMBOL(jz_audio_open_for_fm);
+
+int jz_audio_close_for_fm(void) {
+	jz_audio_release(NULL, &fm_file);
+}
+EXPORT_SYMBOL(jz_audio_close_for_fm);
+
 static int jz_audio_ioctl(struct inode *inode, struct file *file, unsigned int cmd, unsigned long arg)
 {
 	long	rc = -EINVAL;
@@ -2319,8 +2461,31 @@ static int jz_audio_ioctl(struct inode *inode, struct file *file, unsigned int c
 		if (get_user(val, (int *)arg)) {
 			rc = -EFAULT;
 		}
+		if(is_external_codec){
+#if 0
+			unsigned int systemclk = 0;
+			systemclk = val * 256;
+			printk("jz_codec_set_speed:set i2s system clk = %d\n",systemclk);
+			cpm_set_clock(CGU_I2SCLK, systemclk);
+			udelay(2);
+			systemclk = cpm_get_clock(CGU_I2SCLK);
+			printk("jz_codec_set_speed:get i2s system clk = %d\n",systemclk);
+#endif
+			//cpm_set_clock(CGU_I2SCLK, 11289600);//11289600
+                        cpm_set_clock(CGU_I2SCLK, 12288000);//11289600
+                        ///cpm_set_clock(CGU_I2SCLK, 9216000);//11289600
+                        unsigned int i2s_div = REG_AIC_I2SDIV; 
+                        //REG_AIC_I2SDIV = (i2s_div&0xf)|5;//set 384 divider
+                        printk("jz_codec_set_speed:get i2s clk = %d\n",cpm_get_clock(CGU_I2SCLK));
+                        printk("REG_AIC_I2SDIV is 0x%x IDV is %d DV is %d\n",REG_AIC_I2SDIV,(REG_AIC_I2SDIV&0x780) >> 7,REG_AIC_I2SDIV&0xf); 
+		}else{
+			cpm_set_clock(CGU_I2SCLK, JZ_EXTAL);//11289600
+//			cpm_set_clock(CGU_I2SCLK, 11289600);//11289600
+		}
+
 		//printk("SNDCTL_DSP_SPEED ... set to %d\n", val);
 		val = jz_codec_set_speed(codec, val, mode);
+		//printk("SNDCTL_DSP_SPEED ... final set to %d\n", val);
 		rc = put_user(val, (int *)arg);
 		break;
 
@@ -2436,11 +2601,9 @@ static int jz_audio_ioctl(struct inode *inode, struct file *file, unsigned int c
 		}
 
 		/* Restore for return value */
-		if (mode & CODEC_RMODE) {
-            if (codec->user_need_mono) {
-                val = 1;
-            }
-        }
+		if (codec->user_need_mono) {
+			val = 1;
+		}
 
 		rc = put_user(val, (int *)arg);
 		break;
@@ -2721,6 +2884,10 @@ static ssize_t jz_audio_write(struct file *file, const char __user *buffer, size
 
 	ENTER();
 
+	/*  medive  add  */
+	pout_endpoint->is_non_block = file->f_flags & O_NONBLOCK;
+	/* end */
+
 	//dump_dlv_regs(__FUNCTION__);
 	//dump_aic_regs(__FUNCTION__);
 
@@ -2908,6 +3075,7 @@ static ssize_t jz_audio_read(struct file *file, char __user *buffer, size_t coun
 
 	ENTER();
 
+	pin_endpoint->is_non_block = file->f_flags & O_NONBLOCK;
 //	dump_dlv_regs(__FUNCTION__);
 //	dump_aic_regs(__FUNCTION__);
 

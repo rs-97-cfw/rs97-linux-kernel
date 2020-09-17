@@ -112,11 +112,11 @@ config LEDS_HP6XX
 	  HP Jornada 620/660/680/690.
 
 config LEDS_JZGPIO
-        tristate "LED Support for JZ Platform"
-        depends on LEDS_CLASS
-        help
-          This option enable support for JZ Platform LEDS
-          GPIO.
+	tristate "LED Support for JZ Platform"
+	depends on LEDS_CLASS
+	help
+	  This option enable support for JZ Platform LEDS
+	  GPIO.
 
 config LEDS_PCA9532
 	tristate "LED driver for PCA9532 dimmer"

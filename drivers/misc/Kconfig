@@ -13,6 +13,12 @@ menuconfig MISC_DEVICES
 
 if MISC_DEVICES
 
+config JZ_SPI_NOR
+	tristate "Support SPI NOR at Ingenic"
+	depends on JZRISC
+	help
+	  Support SPI NOR Flash to JZ SOC.
+
 config JZ_I2C_SIMULATE
 	bool "i2c simulate need by isp sensor on aquila_board"
 

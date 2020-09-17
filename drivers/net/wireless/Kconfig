@@ -442,6 +442,29 @@ config RTL8187_LEDS
 	depends on RTL8187 && MAC80211_LEDS && (LEDS_CLASS = y || LEDS_CLASS = RTL8187)
 	default y
 
+config RTL8188EU
+	tristate "Realtek 8188E USB WiFi"
+	depends on USB
+	---help---
+	  RealTek 8188ETV driver,maybe support RealTek 8188ES also.
+	  Driver Version: RTL8188EUS_linux_v4.3.0.8_13968.20150417
+	  
+config RTL8189ES
+	tristate "Realtek 8189ES/8189ETV SDIO wifi support"
+	depends on WLAN_80211 && MMC_JZSOC
+	select WIRELESS_EXT
+	select WIRELESS_EXT_SYSFS
+	---help---
+	  RealTek 8189ES driver,support RealTek 8189ETV also.
+	  Driver Version: RTL8189ES_linux_v4.3.0.2_10792.20140318
+	  
+config RTL8189ES_DEBUG
+	tristate "Realtek 8189ES/8189ETV SDIO wifi debug switch"
+	depends on RTL8189ES
+	default y
+	---help---
+	  RealTek 8189ES/8189ETV DEBUG
+
 config ADM8211
 	tristate "ADMtek ADM8211 support"
 	depends on MAC80211 && PCI && WLAN_80211 && EXPERIMENTAL

@@ -46,33 +46,34 @@
  * returned from jz_request_dma().
  */
 
+/**
+ * jz_dma_device -
+ */
+struct jz_dma_device{
+	u32 fifo_addr;
+	u32 dma_mode;
+	u32 dma_source;
+};
+
 struct jz_dma_chan jz_dma_table[MAX_DMA_NUM] = {
-	{dev_id:DMA_ID_BCH_ENC,}, /* DMAC0 channel 0, reserved for BCH */
+	{dev_id:-1,}, 		/* DMAC0 channel 0, reserved for BCH */
 	{dev_id:-1,},		/* DMAC0 channel 1 */
 	{dev_id:-1,},		/* DMAC0 channel 2 */
 	{dev_id:-1,},		/* DMAC0 channel 3 */
-	{dev_id:-1,},		/* DMAC1 channel 0 */
-	{dev_id:-1,},		/* DMAC1 channel 1 */
-	{dev_id:-1,},		/* DMAC1 channel 2 */
-	{dev_id:-1,},		/* DMAC1 channel 3 */
+	{dev_id:-1,},		/* DMAC0 channel 4 */
+	{dev_id:-1,},		/* DMAC0 channel 5 */
 };
 
-// Device FIFO addresses and default DMA modes
-static const struct {
-	unsigned int fifo_addr;
-	unsigned int dma_mode;
-	unsigned int dma_source;
-} dma_dev_table[DMA_ID_MAX] = {
+/**
+ * dma_dev_table - Device FIFO aiddresses and default DMA modes 
+ */
+static const struct jz_dma_device dma_dev_table[DMA_ID_MAX] = {
 	{0, DMA_AUTOINIT, DMAC_DRSR_RS_EXT}, /* External request with DREQn */
 	{0x18000000, DMA_AUTOINIT, DMAC_DRSR_RS_NAND}, /* NAND request */
 	{CPHYSADDR(BCH_DR), DMA_8BIT_TX_CMD | DMA_MODE_WRITE, DMAC_DRSR_RS_BCH_ENC},
 	{CPHYSADDR(BCH_DR), DMA_8BIT_TX_CMD | DMA_MODE_WRITE, DMAC_DRSR_RS_BCH_DEC},
 	{0, DMA_AUTOINIT, DMAC_DRSR_RS_AUTO},
-//	{CPHYSADDR(TSSI_FIFO), DMA_32BIT_RX_CMD | DMA_MODE_READ, DMAC_DRSR_RS_TSSIIN},
-	{CPHYSADDR(UART3_TDR), DMA_8BIT_TX_CMD | DMA_MODE_WRITE, DMAC_DRSR_RS_UART3OUT},
-	{CPHYSADDR(UART3_RDR), DMA_8BIT_RX_CMD | DMA_MODE_READ, DMAC_DRSR_RS_UART3IN},
-	{CPHYSADDR(UART2_TDR), DMA_8BIT_TX_CMD | DMA_MODE_WRITE, DMAC_DRSR_RS_UART2OUT},
-	{CPHYSADDR(UART2_RDR), DMA_8BIT_RX_CMD | DMA_MODE_READ, DMAC_DRSR_RS_UART2IN},
+	{CPHYSADDR(TSSI_FIFO), DMA_32BIT_RX_CMD | DMA_MODE_READ, DMAC_DRSR_RS_TSSIIN},
 	{CPHYSADDR(UART1_TDR), DMA_8BIT_TX_CMD | DMA_MODE_WRITE, DMAC_DRSR_RS_UART1OUT},
 	{CPHYSADDR(UART1_RDR), DMA_8BIT_RX_CMD | DMA_MODE_READ, DMAC_DRSR_RS_UART1IN},
 	{CPHYSADDR(UART0_TDR), DMA_8BIT_TX_CMD | DMA_MODE_WRITE, DMAC_DRSR_RS_UART0OUT},
@@ -84,13 +85,11 @@ static const struct {
 	{CPHYSADDR(MSC_TXFIFO(0)), DMA_32BIT_TX_CMD | DMA_MODE_WRITE, DMAC_DRSR_RS_MSC0OUT},
 	{CPHYSADDR(MSC_RXFIFO(0)), DMA_32BIT_RX_CMD | DMA_MODE_READ, DMAC_DRSR_RS_MSC0IN},
 	{0, DMA_AUTOINIT, DMAC_DRSR_RS_TCU},
-	{SADC_TSDAT, DMA_32BIT_RX_CMD | DMA_MODE_READ, DMAC_DRSR_RS_SADC},/* Touch Screen Data Register */
-	{CPHYSADDR(MSC_TXFIFO(1)), DMA_32BIT_TX_CMD | DMA_MODE_WRITE, DMAC_DRSR_RS_MSC1OUT}, /* SSC1 TX */
-	{CPHYSADDR(MSC_RXFIFO(1)), DMA_32BIT_RX_CMD | DMA_MODE_READ, DMAC_DRSR_RS_MSC1IN},	/* SSC1 RX */
+	{SADC_TSDAT, DMA_32BIT_RX_CMD | DMA_MODE_READ, DMAC_DRSR_RS_SADC}, /* Touch Screen Data Register */
+	{CPHYSADDR(MSC_TXFIFO(1)), DMA_32BIT_TX_CMD | DMA_MODE_WRITE, DMAC_DRSR_RS_MSC1OUT},
+	{CPHYSADDR(MSC_RXFIFO(1)), DMA_32BIT_RX_CMD | DMA_MODE_READ, DMAC_DRSR_RS_MSC1IN},
 	{CPHYSADDR(SSI_DR(1)), DMA_32BIT_TX_CMD | DMA_MODE_WRITE, DMAC_DRSR_RS_SSI1OUT},
 	{CPHYSADDR(SSI_DR(1)), DMA_32BIT_RX_CMD | DMA_MODE_READ, DMAC_DRSR_RS_SSI1IN},
-	{CPHYSADDR(PCM_DP), DMA_16BIT_TX_CMD | DMA_MODE_WRITE, DMAC_DRSR_RS_PMOUT},
-	{CPHYSADDR(PCM_DP), DMA_16BIT_RX_CMD | DMA_MODE_READ, DMAC_DRSR_RS_PMIN},
 	{},
 };
 
@@ -183,7 +182,7 @@ int jz_request_dma(int dev_id, const char *dev_str,
 	chan = &jz_dma_table[i];
 
 	if (irqhandler) {
-		chan->irq = IRQ_DMA_0 + i;	// allocate irq number
+		chan->irq = IRQ_DMA_0 + i;	/* allocate irq number */
 		chan->irq_dev = irq_dev_id;
 		if ((ret = request_irq(chan->irq, irqhandler, irqflags,
 				       dev_str, chan->irq_dev))) {
@@ -196,7 +195,7 @@ int jz_request_dma(int dev_id, const char *dev_str,
 		chan->irq_dev = NULL;
 	}
 
-	// fill it in
+	/* fill it in */
 	chan->io = i;
 	chan->dev_id = dev_id;
 	chan->dev_str = dev_str;
@@ -372,14 +371,15 @@ void enable_dma(unsigned int dmanr)
 		return;
 
 	REG_DMAC_DCCSR(dmanr) &= ~(DMAC_DCCSR_HLT | DMAC_DCCSR_TT | DMAC_DCCSR_AR);
-	REG_DMAC_DCCSR(dmanr) |= DMAC_DCCSR_NDES; /* No-descriptor transfer */
-	__dmac_enable_channel(dmanr);
 	if (chan->irq)
 		__dmac_channel_enable_irq(dmanr);
+
+	 /* No-descriptor transfer */
+	REG_DMAC_DCCSR(dmanr) |= DMAC_DCCSR_NDES;
+	__dmac_enable_channel(dmanr);
 }
 
 #define DMA_DISABLE_POLL 0x10000
-
 void disable_dma(unsigned int dmanr)
 {
 	int i;
@@ -391,17 +391,23 @@ void disable_dma(unsigned int dmanr)
 	if (!__dmac_channel_enabled(dmanr))
 		return;
 
-	for (i = 0; i < DMA_DISABLE_POLL; i++)
-		if (__dmac_channel_transmit_end_detected(dmanr))
-			break;
+	if (chan->irq)
+		__dmac_channel_disable_irq(dmanr);
+	__dmac_disable_channel(dmanr);
+
+	if (!__dmac_channel_transmit_end_detected(dmanr) &&
+	    !__dmac_channel_address_error_detected(dmanr)) {
+		for (i = 0; i < DMA_DISABLE_POLL; i++) {
+			if (__dmac_channel_transmit_halt_detected(dmanr)) {
+				__dmac_channel_clear_transmit_halt(dmanr);
+				break;
+			}
+		}
+	}
 #if 0
 	if (i == DMA_DISABLE_POLL)
 		printk(KERN_INFO "disable_dma: poll expired!\n");
 #endif
-
-	__dmac_disable_channel(dmanr);
-	if (chan->irq)
-		__dmac_channel_disable_irq(dmanr);
 }
 
 /* Note: DMA_MODE_MASK is simulated by sw */
@@ -541,6 +547,39 @@ void jz_set_alsa_dma(unsigned int dmanr, unsigned int mode, unsigned int audio_f
 		REG_DMAC_DRSR(chan->io) = chan->source;
 		break;
 	}
+}
+
+/**
+ * jz_set_ssi_dma_mode -
+ */
+void jz_set_ssi_dma_mode(u32 dmanr, u32 mode, int is_dummy)
+{
+	struct jz_dma_chan *chnl = get_dma_chan(dmanr);
+
+	if (!chnl)
+		return;
+
+	chnl->mode |= mode & ~(DMAC_DCMD_SAI | DMAC_DCMD_DAI);
+	chnl->mode &= ~(DMAC_DCMD_SAI | DMAC_DCMD_DAI);
+
+	switch (mode &= DMA_MODE_MASK) {
+	case DMA_MODE_READ:
+		if (!is_dummy)
+			chnl->mode |= DMAC_DCMD_DAI;
+		break;
+
+	case DMA_MODE_WRITE:
+		if (!is_dummy)
+			chnl->mode |= DMAC_DCMD_SAI;
+		break;
+
+	default :
+		printk(KERN_DEBUG "set_dma_mode() just supports DMA_MODE_READ or DMA_MODE_WRITE!\n");
+		return;
+	}
+
+	REG_DMAC_DCMD(chnl->io) = chnl->mode & ~DMA_MODE_MASK;
+	REG_DMAC_DRSR(chnl->io) = chnl->source;
 }
 
 //#define JZ4750L_DMAC_TEST_ENABLE
@@ -814,6 +853,7 @@ EXPORT_SYMBOL(jz_set_dma_mode);
 EXPORT_SYMBOL(set_dma_mode);
 EXPORT_SYMBOL(jz_set_oss_dma);
 EXPORT_SYMBOL(jz_set_alsa_dma);
+EXPORT_SYMBOL(jz_set_ssi_dma_mode);
 EXPORT_SYMBOL(set_dma_addr);
 EXPORT_SYMBOL(set_dma_count);
 EXPORT_SYMBOL(get_dma_residue);

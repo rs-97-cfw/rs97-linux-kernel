@@ -33,7 +33,7 @@
 
 static unsigned int key_value;
 
-unsigned int umido_button[] = 
+unsigned int umido_button[] =
 {
 	UMIDO_KEY_UP,
     UMIDO_KEY_DOWN,
@@ -45,10 +45,11 @@ unsigned int umido_button[] =
     UMIDO_KEY_Y,
     UMIDO_KEY_START,
     UMIDO_KEY_SELECT,
-    UMIDO_KEYL,
-    UMIDO_KEYR,
+    UMIDO_KEY_L,
+    UMIDO_KEY_R,
+    // GPIO_POWER_ON,
 };
-	
+
 #define TOTAL_BUTTON_NUM sizeof(umido_button)/sizeof(unsigned int)
 
 static int key_open(struct inode *inode, struct file *filp)
@@ -92,7 +93,7 @@ static ssize_t key_read(struct file *filp, char __user *buf, size_t count, loff_
 {
 	int i = 0;
 	key_value = 0;
-	
+
 	for(i = 0; i < TOTAL_BUTTON_NUM; i++)
 	{
 
@@ -110,7 +111,7 @@ static ssize_t key_read(struct file *filp, char __user *buf, size_t count, loff_
 			}
 		}
 	}
-  
+
 #if 0 //adc key
 
 	key_value |= jz_read_key_handle();  //medive add
@@ -118,7 +119,7 @@ static ssize_t key_read(struct file *filp, char __user *buf, size_t count, loff_
 
 #endif
 
-  	
+
 #if 0 //common 2.4G
 	extern unsigned int common_2G4_value;
 	int key_2G4 = common_2G4_value;
@@ -126,14 +127,14 @@ static ssize_t key_read(struct file *filp, char __user *buf, size_t count, loff_
 	key_value |= (key_2G4 & 0xffffffff);
 #endif
 #if 1 //allen add power
-	
+
 	if(__gpio_get_pin(GPIO_POWER_ON) == 0)
 		key_value = 0X300;
 #endif
 
 	//if(key_value)
 	//	printk("key value is 0x%x\n",key_value);
-	
+
 	//fb_resize_start();
   	copy_to_user(buf, &key_value, sizeof(int));
   	return sizeof(int);

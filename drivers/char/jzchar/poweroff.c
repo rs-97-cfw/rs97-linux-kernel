@@ -202,7 +202,7 @@ static void poweroff_delaytimer_routine(unsigned long dummy)
  */
 static irqreturn_t poweroff_irq(int irq, void *dev_id)
 {
-	printk("poweroff irq even coming now!\n");
+	// printk("poweroff irq even coming now!\n");
 	__gpio_ack_irq(POWEROFF_PIN);
 	__gpio_mask_irq(POWEROFF_PIN);
 	__gpio_as_input(POWEROFF_PIN);
@@ -211,7 +211,7 @@ static irqreturn_t poweroff_irq(int irq, void *dev_id)
 #else
 	if (__gpio_get_pin(POWEROFF_PIN)==POWEROFF_PIN_DOWN){
 #endif
-		printk("power off pin is low!\n");
+		// printk("power off pin is low!\n");
 		del_timer(&poweroff_delaytimer);
 		init_timer(&poweroff_delaytimer);
 		poweroff_delaytimer.expires = jiffies + POWEROFF_DELAY;

@@ -17,3 +17,4 @@ obj-$(CONFIG_GPIO_VR41XX)	+= vr41xx_giu.o
 
 obj-$(CONFIG_GPIO_JZ4770)	+= jz4770_gpio.o
 obj-$(CONFIG_GPIO_JZ4760B)	+= jz4760b_gpio.o
+obj-$(CONFIG_GPIO_JZ4750L)	+= jz4750l_gpio.o

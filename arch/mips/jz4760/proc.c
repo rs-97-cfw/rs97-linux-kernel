@@ -34,10 +34,11 @@
 //#define DEBUG 1
 #undef DEBUG
 
+bool mmc_protected = true;
+
 extern void jz4760_fpu_init(unsigned int round);
 
 struct proc_dir_entry *proc_jz_root;
-
 
 /*
  * EMC Modules
@@ -224,7 +225,7 @@ static int cgm_write_proc(struct file *file, const char *buffer, unsigned long c
  * echo 0  > /proc/jz/ipu 	// debug, print ipu_buf
  * od -X /proc/jz/ipu 		// read mem addr
  */
-
+#if 0
 typedef struct _ipu_buf {
 	unsigned int addr;	/* phys addr */
 	unsigned int page_shift;
@@ -235,6 +236,7 @@ typedef struct _ipu_buf {
 static struct _ipu_buf ipu_buf[IPU_BUF_MAX];
 static int ipu_buf_cnt = 0;
 static unsigned char g_asid=0;
+#endif
 
 extern void local_flush_tlb_all(void);
 
@@ -285,6 +287,7 @@ void show_tlb(void)
 	local_irq_restore(flags);
 }
 
+#if 0
 static void ipu_add_wired_entry(unsigned long pid,
 				unsigned long entrylo0, unsigned long entrylo1,
 				unsigned long entryhi, unsigned long pagemask)
@@ -525,6 +528,8 @@ static int ipu_write_proc(struct file *file, const char *buffer, unsigned long c
 
 	return count;
 }
+#endif
+
 
 /*
  * UDC hotplug
@@ -591,7 +596,21 @@ static int mmc_read_proc (char *page, char **start, off_t off,
         return len;
 }
 
-#ifndef CONFIG_ANDROID_PMEM	/* /dev/pmem instead /proc/jz/imem on android platform */
+static int mmc_write_proc(struct file *file, const char *buffer, unsigned long count, void *data)
+{
+	mmc_protected = !!simple_strtol(buffer, 0, 10);
+
+	if (mmc_protected) {
+		printk("jz-msc: MMC_BOOT_AREA_PROTECTED\n");
+	} else {
+		printk("jz-msc: MMC_BOOT_AREA_OPENED\n");
+	}
+
+	return count;
+}
+
+#if 0 /* #ifndef CONFIG_ANDROID_PMEM */
+/* /dev/pmem instead /proc/jz/imem on android platform */
 
 /***********************************************************************
  * IPU memory management (used by mplayer and other apps)
@@ -1076,9 +1095,9 @@ static int idle_write_proc(struct file *file, const char *buffer, unsigned long 
 static int __init jz_proc_init(void)
 {
 	struct proc_dir_entry *res;
-#ifndef CONFIG_ANDROID_PMEM
+#if 0 /* #ifndef CONFIG_ANDROID_PMEM */
 	unsigned int virt_addr, i;
-#endif
+#endif /* #ifndef CONFIG_ANDROID_PMEM */
 
 	proc_jz_root = proc_mkdir("jz", 0);
 
@@ -1106,6 +1125,7 @@ static int __init jz_proc_init(void)
 		res->data = NULL;
 	}
 
+#if 0
 	/* Image process unit */
 	res = create_proc_entry("ipu", 0644, proc_jz_root);
 	if (res) {
@@ -1113,6 +1133,7 @@ static int __init jz_proc_init(void)
 		res->write_proc = ipu_write_proc;
 		res->data = NULL;
 	}
+#endif
 
 	/* udc hotplug */
 	res = create_proc_entry("udc", 0644, proc_jz_root);
@@ -1126,7 +1147,7 @@ static int __init jz_proc_init(void)
 	res = create_proc_entry("mmc", 0644, proc_jz_root);
 	if (res) {
 		res->read_proc = mmc_read_proc;
-		res->write_proc = NULL;
+		res->write_proc = mmc_write_proc;
 		res->data = NULL;
 	}
 
@@ -1138,7 +1159,7 @@ static int __init jz_proc_init(void)
 		res->data = NULL;
 	}
 
-#ifndef CONFIG_ANDROID_PMEM
+#if 0 /* #ifndef CONFIG_ANDROID_PMEM */
 	/*
 	 * Reserve a 16MB memory for IPU on JZ4760.
 	 */

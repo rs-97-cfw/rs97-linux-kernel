@@ -31,7 +31,7 @@
 #include <linux/mmc/host.h>
 #include <linux/act8600_power.h>
 #include <linux/ft5x0x_ts.h>
-#include <linux/gwtc9xxxb_ts.h>
+#include <linux/jz_hdmi.h>
 
 
 #undef DEBUG
@@ -320,18 +320,27 @@ static void pisces_sd_gpio_init(struct device *dev)
 #else
 	__gpio_as_msc0_8bit();
 #endif
+
+#ifdef GPIO_SD0_VCC_EN_N
 	__gpio_as_output1(GPIO_SD0_VCC_EN_N); /* poweroff */
 	__gpio_as_input(GPIO_SD0_CD_N);
+#endif
 }
 
 static void pisces_sd_power_on(struct device *dev)
 {
+
+#ifdef GPIO_SD0_VCC_EN_N
 	__gpio_as_output0(GPIO_SD0_VCC_EN_N);
+#endif
 }
 
 static void pisces_sd_power_off(struct device *dev)
 {
+
+#ifdef GPIO_SD0_VCC_EN_N
 	__gpio_as_output1(GPIO_SD0_VCC_EN_N);
+#endif
 }
 
 static void pisces_sd_cpm_start(struct device *dev)
@@ -347,11 +356,11 @@ static unsigned int pisces_sd_status(struct device *dev)
 	unsigned int status;
 
 	status = (unsigned int) __gpio_get_pin(GPIO_SD0_CD_N);
-#if ACTIVE_LOW_MSC0_CD
+  #if ACTIVE_LOW_MSC0_CD
 	return !status;
-#else
+  #else
 	return status;
-#endif
+  #endif
 #endif
 }
 
@@ -386,16 +395,18 @@ static unsigned int pisces_sd_get_wp(struct device *dev)
 struct mmc_partition_info pisces_partitions[] = {
 	[0] = {"mbr",0,512,0},//0 - 512
 	[1] = {"uboot",512,3*1024*1024-512,0}, // 512 - 2.5MB
-	[2] = {"misc",0x300000,0x1000000,0},//3MB - 1MB
+	[2] = {"misc",0x300000,0x100000,0},//3MB - 1MB
 	[3] = {"kernel",0x400000,0x400000,0},//4MB - 4MB
 	[4] = {"recovery",0x800000,0x400000,0},//8MB -4MB
 
-	[5] = {"rootfs",12*1024*1024,256*1024*1024,1}, //12MB - 256MB
-	[6] = {"data",268*1024*1024,500*1024*1024,1},//268MB - 500MB
-	[7] = {"cache",768*1024*1024,32*1024*1024,1},//768MB - 32MB
-	[8] = {"test_0",0x0,0xffffffff,0},
+	[5] = {"rootfs",12*1024*1024,80*1024*1024,1}, //root
+	[6] = {"data",92*1024*1024,50*1024*1024,1},   //APP
+	[7] = {"cache",142*1024*1024,18*1024*1024,1},  // CFG
+	//[8] = {"test_0",0x0,0xffffffff,0},
+	[8] = {"test_0",160*1024*1024,1683*1024*1024UL,0},//2G is 1843
 };
 #endif
+
 struct jz_mmc_platform_data pisces_sd_data = {
 #ifndef CONFIG_JZ_MSC0_SDIO_SUPPORT
 	.support_sdio   = 0,
@@ -443,23 +454,32 @@ struct jz_mmc_platform_data pisces_sd_data = {
 static void pisces_tf_gpio_init(struct device *dev)
 {
 	__gpio_as_msc1_4bit();
+
+#ifdef GPIO_SD1_VCC_EN_N
 	__gpio_as_output1(GPIO_SD1_VCC_EN_N); /* poweroff */
+#endif
 	__gpio_as_input(GPIO_SD1_CD_N);
 }
 
 static void pisces_tf_power_on(struct device *dev)
 {
+#ifdef GPIO_SD1_VCC_EN_N
 	__gpio_as_output0(GPIO_SD1_VCC_EN_N);
+#endif
 }
 
 static void pisces_tf_power_off(struct device *dev)
 {
+#ifdef GPIO_SD1_VCC_EN_N
 	__gpio_as_output1(GPIO_SD1_VCC_EN_N);
+#endif
 }
 
 static void pisces_tf_cpm_start(struct device *dev)
 {
+	printk("===>start MSC1 clock!\n");
 	cpm_start_clock(CGM_MSC1);
+	printk("===>REG_CPM_CLKGR0 = 0x%08x\n", REG_CPM_CLKGR0);
 }
 
 static unsigned int pisces_tf_status(struct device *dev)
@@ -519,22 +539,31 @@ struct jz_mmc_platform_data pisces_tf_data = {
 static void pisces_msc2_gpio_init(struct device *dev)
 {
 	__gpio_as_msc2_8bit();
-	__gpio_as_output1(GPIO_SD0_VCC_EN_N); /* poweroff */
-	__gpio_as_input(GPIO_SD0_CD_N);
+	
+#ifdef GPIO_SD2_VCC_EN_N
+	__gpio_as_output1(GPIO_SD2_VCC_EN_N); /* poweroff */
+	__gpio_as_input(GPIO_SD2_CD_N);
+#endif
 
 	return;
 }
 
 static void pisces_msc2_power_on(struct device *dev)
 {
-	__gpio_as_output0(GPIO_SD0_VCC_EN_N);
+	
+#ifdef GPIO_SD2_VCC_EN_N
+	__gpio_as_output0(GPIO_SD2_VCC_EN_N);
+#endif
 
 	return;
 }
 
 static void pisces_msc2_power_off(struct device *dev)
 {
-	__gpio_as_output1(GPIO_SD0_VCC_EN_N);
+
+#ifdef GPIO_SD2_VCC_EN_N
+	__gpio_as_output1(GPIO_SD2_VCC_EN_N);
+#endif
 
 	return;
 }
@@ -548,8 +577,8 @@ static unsigned int pisces_msc2_status(struct device *dev)
 {
 	unsigned int status;
 
-	status = (unsigned int) __gpio_get_pin(GPIO_SD0_CD_N);
-#if ACTIVE_LOW_MSC0_CD
+	status = (unsigned int) __gpio_get_pin(GPIO_SD2_CD_N);
+#if ACTIVE_LOW_MSC2_CD
 	return !status;
 #else
 	return status;
@@ -559,16 +588,16 @@ static unsigned int pisces_msc2_status(struct device *dev)
 static void pisces_msc2_plug_change(int state)
 {
 	if(state == CARD_INSERTED) /* wait for remove */
-#if ACTIVE_LOW_MSC0_CD
-		__gpio_as_irq_high_level(MSC0_HOTPLUG_PIN);
+#if ACTIVE_LOW_MSC2_CD
+		__gpio_as_irq_high_level(MSC2_HOTPLUG_PIN);
 #else
-	__gpio_as_irq_low_level(MSC0_HOTPLUG_PIN);
+	__gpio_as_irq_low_level(MSC2_HOTPLUG_PIN);
 #endif
 	else		      /* wait for insert */
-#if ACTIVE_LOW_MSC0_CD
-		__gpio_as_irq_low_level(MSC0_HOTPLUG_PIN);
+#if ACTIVE_LOW_MSC2_CD
+		__gpio_as_irq_low_level(MSC2_HOTPLUG_PIN);
 #else
-	__gpio_as_irq_high_level(MSC0_HOTPLUG_PIN);
+	__gpio_as_irq_high_level(MSC2_HOTPLUG_PIN);
 #endif
 
 	return;
@@ -581,8 +610,8 @@ struct jz_mmc_platform_data pisces_msc2_data = {
 	.support_sdio   = 1,
 #endif
 	.ocr_mask	= MMC_VDD_32_33 | MMC_VDD_33_34,
-	.status_irq	= MSC0_HOTPLUG_IRQ,
-	.detect_pin     = GPIO_SD0_CD_N,
+	.status_irq	= MSC2_HOTPLUG_IRQ,
+	.detect_pin     = GPIO_SD2_CD_N,
 	.init           = pisces_msc2_gpio_init,
 	.power_on       = pisces_msc2_power_on,
 	.power_off      = pisces_msc2_power_off,
@@ -604,8 +633,8 @@ struct jz_mmc_platform_data pisces_msc2_data = {
 void __init board_msc_init(void)
 {
 	jz_add_msc_devices(0, &pisces_sd_data);
-	jz_add_msc_devices(1, &pisces_tf_data);
-	jz_add_msc_devices(2, &pisces_msc2_data);
+	//jz_add_msc_devices(1, &pisces_tf_data);
+	//jz_add_msc_devices(2, &pisces_msc2_data); //allen del
 }
 
 static void pisces_timer_callback(void)
@@ -620,9 +649,22 @@ static void pisces_timer_callback(void)
 
 static void __init board_cpm_setup(void)
 {
-	/* Stop unused module clocks here.
-	 * We have started all module clocks at arch/mips/jz4760/setup.c.
-	 */
+	//allen add
+#ifdef HAVE_OTHER_UART
+	__gpio_as_uart0();
+	__cpm_start_uart0();
+	
+	//__cpm_start_uart1(); //ethernel have use
+	
+	#if JZ_EARLY_UART_BASE != UART2_BASE
+		//__cpm_start_uart2(); //default is uart2,so needn't add
+		//__gpio_as_uart2();
+	#endif
+
+	 __gpio_as_uart3();
+	__cpm_start_uart3();
+	
+#endif
 }
 
 static void __init board_gpio_setup(void)
@@ -631,20 +673,30 @@ static void __init board_gpio_setup(void)
 	 * Initialize SDRAM pins
 	 */
 }
+
+#ifdef CONFIG_PMU_ACT8600_SUPPORT
 static struct act8600_outputs_t act8600_outputs[] = {
-//        {1,0x30,1},//out1 1.2V - 0b110000
-	{4,0x57,1},//out4 5.3v for otg connect wifi
+#if 0
+        {1,0x30,1},//out1 1.2V - 0b110000
         {5,0x31,1},//out5 2.5  - 0b110001
         {6,0x39,0},//out6 LCD3.3V  - 0b111001
         {7,0x18,0},//out7 1.2V CON - 0b011000
         {8,0x24,0},//out8 1.8V CON - 0b100100
+#else
+    	{4,0x54,1},//out4 5.0V -
+      //	{4,0x39,1},//out4 2.5V - 0b110001
+        {5,0x31,1},//out5 2.5  - 0b110001
+        {6,0x39,0},//out6 LCD3.3V  - 0b111001
+        {7,0x39,1},//out7 3.3V CON - 0b011000
+        {8,0x24,1},//out8 1.8V CON - 0b100100
+#endif
 };
 
 static struct act8600_platform_pdata_t act8600_platform_pdata = {
         .outputs = act8600_outputs,
         .nr_outputs = ARRAY_SIZE(act8600_outputs),
 };
-
+#endif
 
 
 static struct i2c_board_info pisces_i2c1_devs[] __initdata = {
@@ -652,11 +704,12 @@ static struct i2c_board_info pisces_i2c1_devs[] __initdata = {
 		    I2C_BOARD_INFO("nmi", 0x60),
 
 	},
-
+#ifdef CONFIG_PMU_ACT8600_SUPPORT
 	{
 		I2C_BOARD_INFO(ACT8600_NAME, 0x5a),
 		.platform_data = &act8600_platform_pdata,
 	},
+#endif
 
 };
 #ifdef CONFIG_TOUCHSCREEN_FT5X0X
@@ -665,11 +718,6 @@ static struct ft5x0x_ts_platform_data ft5x0x_ts_pdata = {
 };
 #endif
 
-#ifdef CONFIG_TOUCHSCREEN_GWTC9XXXB
-static struct gwtc9xxxb_ts_platform_data gwtc9xxxb_ts_pdata = {
-        .intr = GPIO_GWTC9XXXB_INT,
-};
-#endif
 static struct i2c_board_info pisces_i2c0_devs[] __initdata = {
         {
                 I2C_BOARD_INFO("ov3640", 0x3c),
@@ -685,19 +733,15 @@ static struct i2c_board_info pisces_i2c0_devs[] __initdata = {
                 I2C_BOARD_INFO("jz_ep932", 0x38),
 	},
 #endif
-#ifdef CONFIG_TOUCHSCREEN_FT5X0X
         {
-                I2C_BOARD_INFO(FT5X0X_NAME, 0x38),
-                .irq = GPIO_TS_I2C_IRQ,
-                .platform_data = &ft5x0x_ts_pdata,
-        },
-#endif
-#ifdef  CONFIG_TOUCHSCREEN_GWTC9XXXB
-        {
-                I2C_BOARD_INFO(GWTC9XXXB_NAME, 0x05),
-                .irq = GPIO_GWTC9XXXB_IRQ,
-                .platform_data = &gwtc9xxxb_ts_pdata,
-        },
+                I2C_BOARD_INFO("fm5807_i2c", 0x11),  //0x11 
+	},
+#if 0
+	{
+	        I2C_BOARD_INFO(FT5X0X_NAME, 0x38),
+		.irq = GPIO_TS_I2C_IRQ,
+		.platform_data = &ft5x0x_ts_pdata,
+	},
 #endif
         {
         },

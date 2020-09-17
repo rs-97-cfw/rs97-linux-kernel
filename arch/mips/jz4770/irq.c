@@ -335,6 +335,18 @@ void __init arch_init_irq(void)
 			continue;
 		if (unlikely(i == JZ_BOOTUP_UART_RXD))
 			continue;
+		
+	#ifdef HAVE_OTHER_UART//allen add
+		if (unlikely(i == JZ_BOOTUP_UART0_TXD))
+			continue;
+		if (unlikely(i == JZ_BOOTUP_UART0_RXD))
+			continue;
+		if (unlikely(i == JZ_BOOTUP_UART3_TXD))
+			continue;
+		if (unlikely(i == JZ_BOOTUP_UART3_RXD))
+			continue;
+	#endif
+	
 		disable_gpio_irq(IRQ_GPIO_0 + i);
 		set_irq_chip_and_handler(IRQ_GPIO_0 + i, &gpio_irq_type, handle_level_irq);
 	}

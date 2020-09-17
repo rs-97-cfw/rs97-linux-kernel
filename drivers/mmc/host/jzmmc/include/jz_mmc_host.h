@@ -53,7 +53,7 @@
  * We are very sorry, but you can try faster clock at your own risk.
  */
 #if defined(CONFIG_SOC_JZ4770)
-#define SD_CLOCK_MAX   24000000
+#define SD_CLOCK_MAX   48000000
 #else
 #define SD_CLOCK_MAX   24000000
 #endif

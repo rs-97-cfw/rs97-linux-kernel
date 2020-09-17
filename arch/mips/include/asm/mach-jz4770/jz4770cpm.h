@@ -212,6 +212,12 @@
 #define CLKGR0_BCH              BIT1
 #define CLKGR0_NEMC             BIT0
 
+//allen add 
+#define __cpm_start_uart3()     (REG_CPM_CLKGR0 &= ~CLKGR0_UART3)
+#define __cpm_start_uart2()     (REG_CPM_CLKGR0 &= ~CLKGR0_UART2)
+#define __cpm_start_uart1()     (REG_CPM_CLKGR0 &= ~CLKGR0_UART1)
+#define __cpm_start_uart0()     (REG_CPM_CLKGR0 &= ~CLKGR0_UART0)
+
 /* Oscillator and power control register(OPCR) */
 #define OPCR_OTGPHY_ENABLE      BIT7    /* SPENDN bit */
 #define OPCR_GPSEN              BIT6

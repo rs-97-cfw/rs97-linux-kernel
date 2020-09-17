@@ -37,6 +37,7 @@ source "sound/soc/sh/Kconfig"
 source "sound/soc/txx9/Kconfig"
 source "sound/soc/jz4740/Kconfig"
 source "sound/soc/jz4750/Kconfig"
+#source "sound/soc/jz4760/Kconfig"
 source "sound/soc/jz47xx/Kconfig"
 
 # Supported codecs

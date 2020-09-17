@@ -5,6 +5,8 @@
 menu "Graphics support"
 	depends on HAS_IOMEM
 
+source "drivers/gpu/vivante/Kconfig"
+
 source "drivers/char/agp/Kconfig"
 
 source "drivers/gpu/drm/Kconfig"
@@ -16,7 +18,7 @@ config VGASTATE
 config VIDEO_OUTPUT_CONTROL
 	tristate "Lowlevel video output switch controls"
 	help
-	  This framework adds support for low-level control of the video 
+	  This framework adds support for low-level control of the video
 	  output switch.
 
 menuconfig FB
@@ -269,7 +271,7 @@ config FB_JZ475X_LCD_OUTPUT
 choice
 	depends on FB_JZ475X_LCD_OUTPUT
 	prompt "LCD Output Support"
-	default FB_JZ475X_LCD_PANEL_AUO_A043FL01V2	
+	default FB_JZ475X_LCD_PANEL_AUO_A043FL01V2
 	---help---
 	   Please select the lcd panel in you board
 
@@ -292,7 +294,7 @@ config FB_JZ4740_SLCD
 	depends on FB_JZSOC && SOC_JZ4740
 	default n
 	---help---
-	  This is the frame buffer device driver for the JZ4740 Smart LCD controller. 
+	  This is the frame buffer device driver for the JZ4740 Smart LCD controller.
 	  If select this, please set <JZ4740 LCD controller support> to <n>.
 
 choice
@@ -309,7 +311,7 @@ config JZ_SLCD_SPFD5420A
 	bool "SPFD5420A Smart LCD panel"
 	---help---
 	Driver for Smart LCD SPFD5420A 18-bit sytem interface, 18BPP.
-	
+
 config JZ_SLCD_TRULY
 	bool "TRULY Smart LCD panel (MAX Pixels 400x240)"
 	---help---
@@ -357,6 +359,7 @@ config JZLCD_FRAMEBUFFER_BPP
 	default 32
        	---help---
 	  JZ LCD driver framebuffer support 8bpp, 16bpp, 32bpp
+
 choice
 	depends on FB_JZLCD_4730_4740
 	prompt "LCD Panel"
@@ -449,14 +452,15 @@ config JZ4750_IPU_MM
 	depends on FB_JZSOC && FB_JZ4750_LCD
 	default y
 	---help---
-	   Enable IPU Memory Management system. 
-	   It will reserve 16MB / 16MB + 4MB as IPU Framebuffer on JZ4750 / JZ4755. 
+	   Enable IPU Memory Management system.
+	   It will reserve 16MB / 16MB + 4MB as IPU Framebuffer on JZ4750 / JZ4755.
 	   Enable this if you want to use IPU.
 
 config FB_JZ4750_SLCD
 	bool
 	depends on FB_JZ4750_LCD
 	default n
+
 choice
 	depends on FB_JZ4750_LCD
 	prompt "JZ4750 LCD Panels Support"
@@ -502,102 +506,69 @@ endchoice
 
 config FB_JZ4760_LCD
 	tristate "JZ4760 LCD Controller support"
-	depends on FB_JZSOC && (SOC_JZ4760 || SOC_JZ4760B)
+	depends on FB_JZSOC && (SOC_JZ4760 || SOC_JZ4760B || SOC_JZ4770)
 	---help---
 	   JZ4760 LCD Controller driver.
 	   JZ4760 LCD Controller support OSD function(refer jz4760_lcdc_spec.pdf).JZ4760 LCD OSD implement 2 framebuffer layers: foreground0 and foreground1. JZ4760 LCD driver support only foreground0 default.
 
-config FB_JZ4760_LCD_USE_2LAYER_FRAMEBUFFER
-	bool "JZ4760 LCD driver 2 layers framebuffer support."
-	depends on FB_JZ4760_LCD
-	---help---
-	   JZ4760 LCD driver support only foreground0 by default.
-	   If you need both foreground0 and foreground1, please select this.
+source "drivers/video/lcd/Kconfig"
+
+#config FB_JZ4760_LCD_USE_2LAYER_FRAMEBUFFER
+#	bool "JZ4760 LCD driver 2 layers framebuffer support."
+#	depends on FB_JZ4760_LCD
+#	---help---
+#	   JZ4760 LCD driver support only foreground0 by default.
+#	   If you need both foreground0 and foreground1, please select this.
 
 config FB_JZ4760_TVE
 	tristate "JZ4760 TV Encode support"
 	depends on FB_JZSOC && FB_JZ4760_LCD
 	default n
-	
+
 config JZ4760_HDMI_DISPLAY
-	tristate "HDMI display support"	
+	tristate "HDMI display support"
 	depends on FB_JZSOC && FB_JZ4760_LCD
 	default n
 
-config JZ4760_IPU_MM
-	tristate "JZ4760 IPU MM support"
-	depends on FB_JZSOC && FB_JZ4760_LCD
-	default y
-	---help---
-	   Enable IPU Memory Management system. 
-	   It will reserve 16MB / 16MB + 4MB as IPU Framebuffer on JZ4750 / JZ4755. 
-	   Enable this if you want to use IPU.
+source "drivers/video/hdmi/Kconfig"
+
+#config JZ4760_IPU_MM
+#	tristate "JZ4760 IPU MM support"
+#	depends on FB_JZSOC && FB_JZ4760_LCD
+#	default y
+#	---help---
+#	   Enable IPU Memory Management system.
+#	   It will reserve 16MB / 16MB + 4MB as IPU Framebuffer on JZ4750 / JZ4755.
+#	   Enable this if you want to use IPU.
 
 config FB_JZ4760_SLCD
 	bool
 	depends on FB_JZ4760_LCD
 	default n
-choice
-	depends on FB_JZ4760_LCD
-	prompt "JZ4760 LCD Panels Support"
-	default JZ4760_LCD_SAMSUNG_LTP400WQF02
+
+config JZ_AOSD
+        bool "JZ OSD Alpha Blending support"
+	depends on FB_JZSOC && (SOC_JZ4760B || SOC_JZ4770)
+	default n
 	---help---
-	   Please select the lcd panel in you board
+		JZ ALPHA OSD driver. If you use compress founction this should not be selected.
 
-config JZ4760_LCD_SAMSUNG_LTP400WQF01
-	bool "SAMSUNG LTP400WQF01 TFT panel (480x272)(16bits)"
-
-config JZ4760_LCD_SAMSUNG_LTP400WQF02
-	bool "SAMSUNG LTP400WQF02 TFT panel (480x272)(18bits)"
-
-config JZ4760_LCD_AUO_A043FL01V2
-	bool "AUO A043FL01V2 TFT panel (480x272)(24bits)"
-
-config JZ4760_LCD_FOXCONN_PT035TN01
-     	bool "FOXCONN PT035TN01 TFT panel (320x240,3.5in)(18bit-parallel mode)"
-
-config JZ4760_LCD_INNOLUX_PT035TN01_SERIAL
-     	bool "INNOLUX PT035TN01 TFT panel (320x240,3.5in)(8bit-serial mode)"
-
-config JZ4760_LCD_TOPPOLY_TD025THEA7_RGB_DELTA
-	bool "TOPPOLY_TD025THEA7 TFT panel(320x240)(serial RGB delta mode)"
-
-config JZ4760_LCD_TOPPOLY_TD043MGEB1
-	bool "TOPPOLY_TD043MGEB1 TFT panel(800x480)(24bit mode)"
-
-config JZ4760_LCD_TRULY_TFTG320240DTSW_18BIT
-	bool "TRULY_TFTG320240DTSW TFT panel (320x240) (Parallel 18bit mode)"
-
-config JZ4760_LCD_TRULY_TFT_GG1P0319LTSW_W
-	bool "TRULY_TFT_GG1P0319LTSW_W (240x320) (Smart LCD 16bit)"
-
-config JZ4760_SLCD_KGM701A3_TFT_SPFD5420A
-	bool "KGM701A3_TFT_SPFD5420A (400x240) (Smart LCD 18bit)"
-	select FB_JZ4750_SLCD
-
-config JZ4760_LCD_RS97_V10
-	bool "AUO A030JTN01 For RetroGame Console V1.0"
-
-config JZ4760_LCD_RS97_V21
-	bool "INNOLUX EJ030NA-01B For RetroGame Console V2.1"
-
-config JZ4760_LCD_RS97_V30
-	bool "LianKeWeiYe LKWY030A01 For RetroGame Console V3.0"
-	
-config JZ4760_VGA_DISPLAY
-	depends on SOC_JZ4760 || SOC_JZ4760B
-	bool "Jz4760 VGA Display"
-endchoice
+config JZ_COMPRESS
+        bool "JZ Compress support"
+	depends on FB_JZSOC && (SOC_JZ4760B || SOC_JZ4770)
+	default n
+	---help---
+		JZ compress driver. If you use Alpha OSD function this should not be selected.
 
 config JZ4810_AOSD
-        bool "JZ4810 osd alpha blending support."
+        bool "JZ4810 OSD Alpha Blending support"
 	depends on FB_JZSOC && (SOC_JZ4810)
 	default n
 	---help---
 		JZ4810 ALPHA OSD driver,if you use compress founction,this should not be selected.
 
 config JZ4810_COMPRESS
-        bool "JZ4810 COMPRESS  support."
+        bool "JZ4810 Compress support"
 	depends on FB_JZSOC && (SOC_JZ4810)
 	default n
 	---help---
@@ -627,14 +598,15 @@ config JZ4810_IPU_MM
 	depends on FB_JZSOC && FB_JZ4810_LCD
 	default y
 	---help---
-	   Enable IPU Memory Management system. 
-	   It will reserve 16MB / 16MB + 4MB as IPU Framebuffer on JZ4750 / JZ4755. 
+	   Enable IPU Memory Management system.
+	   It will reserve 16MB / 16MB + 4MB as IPU Framebuffer on JZ4750 / JZ4755.
 	   Enable this if you want to use IPU.
 
 config FB_JZ4810_SLCD
 	bool
 	depends on FB_JZ4810_LCD
 	default n
+
 choice
 	depends on FB_JZ4810_LCD
 	prompt "JZ4810 LCD Panels Support"
@@ -681,11 +653,10 @@ endchoice
 
 config FB_JZ4760_EPD
 	tristate "JZ4760 EPD Controller support"
-	depends on FB_JZSOC && (SOC_JZ4760 || SOC_JZ4760B)
+	depends on FB_JZSOC && (SOC_JZ4760 || SOC_JZ4760B || SOC_JZ4770)
 	---help---
 	   JZ4760 EPD Controller driver.
 	   JZ4760 EPD Controller support OSD function(refer jz4760_epdc_spec.pdf).JZ4760 EPD OSD implement 2 framebuffer layers: foreground0 and foreground1. JZ4760 EPD driver support only foreground0 default.
-
 
 choice
 	depends on FB_JZ4760_EPD
@@ -1114,7 +1085,7 @@ config FB_STI
 	  BIOS routines contained in a ROM chip in HP PA-RISC based machines.
 	  Enabling this option will implement the linux framebuffer device
 	  using calls to the STI BIOS routines for initialisation.
-	
+
 	  If you enable this option, you will get a planar framebuffer device
 	  /dev/fb which will work on the most common HP graphic cards of the
 	  NGLE family, including the artist chips (in the 7xx and Bxxx series),
@@ -1553,36 +1524,36 @@ config FB_I810
 	select FB_CFB_IMAGEBLIT
 	select VGASTATE
 	help
-	  This driver supports the on-board graphics built in to the Intel 810 
+	  This driver supports the on-board graphics built in to the Intel 810
           and 815 chipsets.  Say Y if you have and plan to use such a board.
 
           To compile this driver as a module, choose M here: the
 	  module will be called i810fb.
 
-          For more information, please read 
+          For more information, please read
 	  <file:Documentation/fb/intel810.txt>
 
 config FB_I810_GTF
 	bool "use VESA Generalized Timing Formula"
 	depends on FB_I810
 	help
-	  If you say Y, then the VESA standard, Generalized Timing Formula 
+	  If you say Y, then the VESA standard, Generalized Timing Formula
           or GTF, will be used to calculate the required video timing values
-	  per video mode.  Since the GTF allows nondiscrete timings 
+	  per video mode.  Since the GTF allows nondiscrete timings
           (nondiscrete being a range of values as opposed to discrete being a
-          set of values), you'll be able to use any combination of horizontal 
+          set of values), you'll be able to use any combination of horizontal
 	  and vertical resolutions, and vertical refresh rates without having
 	  to specify your own timing parameters.  This is especially useful
-	  to maximize the performance of an aging display, or if you just 
-          have a display with nonstandard dimensions. A VESA compliant 
+	  to maximize the performance of an aging display, or if you just
+          have a display with nonstandard dimensions. A VESA compliant
 	  monitor is recommended, but can still work with non-compliant ones.
-	  If you need or want this, then select this option. The timings may 
-	  not be compliant with Intel's recommended values. Use at your own 
+	  If you need or want this, then select this option. The timings may
+	  not be compliant with Intel's recommended values. Use at your own
 	  risk.
 
-          If you say N, the driver will revert to discrete video timings 
+          If you say N, the driver will revert to discrete video timings
 	  using a set recommended by Intel in their documentation.
-  
+
           If unsure, say N.
 
 config FB_I810_I2C
@@ -1700,10 +1671,10 @@ config FB_MATROX_G
 	  G450/G550 secondary head and digital output are supported without
 	  additional modules.
 
-	  The driver starts in monitor mode. You must use the matroxset tool 
-	  (available at <ftp://platan.vc.cvut.cz/pub/linux/matrox-latest/>) to 
-	  swap primary and secondary head outputs, or to change output mode.  
-	  Secondary head driver always start in 640x480 resolution and you 
+	  The driver starts in monitor mode. You must use the matroxset tool
+	  (available at <ftp://platan.vc.cvut.cz/pub/linux/matrox-latest/>) to
+	  swap primary and secondary head outputs, or to change output mode.
+	  Secondary head driver always start in 640x480 resolution and you
 	  must use fbset to change it.
 
 	  Do not forget that second head supports only 16 and 32 bpp
@@ -1806,7 +1777,7 @@ config FB_RADEON_I2C
 	select FB_DDC
 	default y
 	help
-	  Say Y here if you want DDC/I2C support for your Radeon board. 
+	  Say Y here if you want DDC/I2C support for your Radeon board.
 
 config FB_RADEON_BACKLIGHT
 	bool "Support for backlight control"
@@ -2006,7 +1977,7 @@ config FB_NEOMAGIC
 	select VGASTATE
 	help
 	  This driver supports notebooks with NeoMagic PCI chips.
-	  Say Y if you have such a graphics card. 
+	  Say Y if you have such a graphics card.
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called neofb.
@@ -2061,7 +2032,7 @@ config FB_VOODOO1
 	select FB_CFB_COPYAREA
 	select FB_CFB_IMAGEBLIT
 	---help---
-	  Say Y here if you have a 3Dfx Voodoo Graphics (Voodoo1/sst1) or 
+	  Say Y here if you have a 3Dfx Voodoo Graphics (Voodoo1/sst1) or
 	  Voodoo2 (cvg) based graphics card.
 
 	  To compile this driver as a module, choose M here: the

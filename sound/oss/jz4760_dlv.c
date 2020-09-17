@@ -139,6 +139,8 @@ static unsigned int g_receiver_mute = 0;
 static unsigned int g_mic1_mute = 0;
 static unsigned int g_mic2_mute = 0;
 static unsigned int g_volumes[SND_DEVICE_COUNT];
+static void dlv_enable_speaker(void);
+static void dlv_disable_speaker(void);
 */
 
 /* Audio route ops */
@@ -147,8 +149,6 @@ static void dlv_enable_hp_out(void);
 static void dlv_disable_hp_out(void);
 static void dlv_enable_btl(void);
 static void dlv_disable_btl(void);
-static void dlv_enable_speaker(void);
-static void dlv_disable_speaker(void);
 static void dlv_enable_receiver(void);
 static void dlv_disable_receiver(void);
 static void dlv_enable_line_out(void);
@@ -250,7 +250,7 @@ void dlv_write_reg(int addr, int val)
 
 static inline void dlv_sleep_wait_bitset(int reg, unsigned bit, int stime, int line)
 {
-	int count = 0;	
+	int count = 0;
 	while(!(dlv_read_reg(reg) & (1 << bit))) {
 		msleep(stime);
 		if(count++ >3){
@@ -262,7 +262,7 @@ static inline void dlv_sleep_wait_bitset(int reg, unsigned bit, int stime, int l
 
 static inline void dlv_sleep_wait_bitclear(int reg, unsigned bit, int stime)
 {
-	int count = 0;	
+	int count = 0;
 	while((dlv_read_reg(reg) & (1 << bit))){
 		msleep(stime);
 		if(count++ >3){
@@ -533,7 +533,7 @@ static void dlv_turn_off(int mode)
 	ENTER();
 
 	if ((mode & REPLAY) && (mode & RECORD)) {
-		
+
 		printk("JZ DLV: Close REPLAY and RECORD\n");
 #if 1
 		//dlv_write_reg_bit(1, 1, 5);//DAC_MUTE->1
@@ -683,7 +683,7 @@ inline static void udelay_jz(int usec)
         "nop\n\t"
         "nop\n\t"
         "nop\n\t"
-        ); 
+        );
   }
 }
 
@@ -823,7 +823,7 @@ void dlv_set_replay_volume(int val)
 	if (val == 0) {
 		__dlv_set_godr(0x1f | 0x80);
 		dlv_mute(1);
-	} 
+	}
 	else
 	{
 		__dlv_set_godr(0x00 | 0x80);
@@ -857,7 +857,7 @@ static void dlv_set_mic_volume(int val)
 
                 fixed_vol = (5 * val % 50) / 13;
                 __dlv_set_gidr(fixed_vol | 0x80);
-        }else{  
+        }else{
                 __dlv_set_gim(0x5 << 3);
 
                 fixed_vol = (val - 50) / 3;
@@ -957,7 +957,7 @@ static void dlv_disable_btl(void)
 }
 
 /**
- * Enable SPERKER replay mode
+ * Enable SPEAKER replay mode
  *
  */
 // extern unsigned int panle_mode;
@@ -980,7 +980,7 @@ static void dlv_enable_speaker(void)
 }
 
 /**
- * Disable SPERKER replay mode
+ * Disable SPEAKER replay mode
  *
  */
 static void dlv_disable_speaker(void)
@@ -993,7 +993,6 @@ static void dlv_disable_speaker(void)
 #endif
 }
 
-
 static void dlv_enable_receiver(void)
 {
 //	__dlv_set_16ohm_load();
@@ -1003,7 +1002,7 @@ static void dlv_enable_receiver(void)
 }
 
 static void dlv_set_replay_record(unsigned int input_src, int bypass) {
-	if (input_src == USE_MIC) 
+	if (input_src == USE_MIC)
 		dlv_enable_line_in_record(0);
 	else if (input_src == USE_LINEIN)      /* linein */
 	{
@@ -1592,7 +1591,7 @@ static void dlv_resume(void)
 static int jzdlv_ioctl(void *context, unsigned int cmd, unsigned long arg)
 {
 	int ret = 0;
-	
+
 	ENTER();
 	DUMP_CODEC_REGS(__FUNCTION__);
 	DPRINT_CODEC("[dlv IOCTL]++++++++++++++++++++++++++++\n");
@@ -1637,11 +1636,11 @@ static int jzdlv_ioctl(void *context, unsigned int cmd, unsigned long arg)
 		if (arg == 1) {
 			dlv_enable_speaker();
 			//printk("speaker!!!!\n");
-                 
+
                 } else {
                   dlv_disable_speaker();
                   dlv_enable_hp_out();
-                  
+
 		}
 		break;
 
@@ -1675,7 +1674,7 @@ static int jzdlv_ioctl(void *context, unsigned int cmd, unsigned long arg)
 		else if (arg == USE_MIC)
 			board_set_record();
 #else
-		board_set_record(); 
+		board_set_record();
 #endif
 		break;
 
@@ -1816,7 +1815,7 @@ static inline void dlv_short_circut_handler(void)
 
 #define VOL_DELAY_BASE 22               //per VOL delay time in ms
 
-	curr_vol = dlv_read_reg(DLV_REG_GCR1);  //read the current HP volume	 
+	curr_vol = dlv_read_reg(DLV_REG_GCR1);  //read the current HP volume
 	delay = VOL_DELAY_BASE * (0x20 - (curr_vol & 0x1f));
 
 	dlv_write_reg(0x0c, 0x1f);
@@ -1956,19 +1955,19 @@ static struct timer_list hp_irq_timer;
 
 static void hp_ack_timer(unsigned long data)
 {
-  //printk("%s %d %s\n",__FILE__,__LINE__,__func__);
-  
-	if(__gpio_get_pin(EARPHONE_DETE) != DETE_ACTIV_LEVEL)
+	if (
+		(__gpio_get_pin(EARPHONE_DETE) != DETE_ACTIV_LEVEL) &&
+		(__gpio_get_pin(AV_OUT_DETE) != DETE_ACTIV_LEVEL)
+	)
   	{
 		hp_in = 0;
-		
-	    printk("no hp %s %d %s\n",__FILE__,__LINE__,__func__);
+	    printk("%s: hp not connected\n",__func__);
 	    dlv_enable_speaker();
 	}
   	else
   	{
 	  	hp_in = 1;
-    	printk("hp %s %d %s\n",__FILE__,__LINE__,__func__);
+	    printk("%s: hp connected\n",__func__);
     	dlv_disable_speaker();
   	}
 }
@@ -1976,20 +1975,26 @@ static void hp_ack_timer(unsigned long data)
 static irqreturn_t hp_pnp_irq(int irq, void *dev_id)
 {
   /* mask interrupt */
-  __gpio_mask_irq(EARPHONE_DETE); 
+  __gpio_mask_irq(EARPHONE_DETE);
+  __gpio_mask_irq(AV_OUT_DETE);
   //printk("hp dete irq");
-#if 1
 	__gpio_disable_pull(EARPHONE_DETE);
 	if(__gpio_get_pin(EARPHONE_DETE) != 0)
-	__gpio_as_irq_low_level(EARPHONE_DETE);
+		__gpio_as_irq_low_level(EARPHONE_DETE);
 	else
-	__gpio_as_irq_high_level(EARPHONE_DETE);
-#endif
+		__gpio_as_irq_high_level(EARPHONE_DETE);
+
+	__gpio_disable_pull(AV_OUT_DETE);
+	if(__gpio_get_pin(AV_OUT_DETE) != 0)
+		__gpio_as_irq_low_level(AV_OUT_DETE);
+	else
+		__gpio_as_irq_high_level(AV_OUT_DETE);
 
   hp_irq_timer.expires = jiffies + 1*HZ;
   del_timer(&hp_irq_timer);
   add_timer(&hp_irq_timer);
-  __gpio_unmask_irq(EARPHONE_DETE); 
+  __gpio_unmask_irq(EARPHONE_DETE);
+  __gpio_unmask_irq(AV_OUT_DETE);
   return IRQ_HANDLED;
 }
 #endif
@@ -2020,7 +2025,7 @@ static int __init init_dlv(void)
 		return retval;
 	}
 
-#ifdef  EARPHONE_DETE 
+#ifdef  EARPHONE_DETE
 
         init_timer(&hp_irq_timer);
         hp_irq_timer.function = hp_ack_timer;
@@ -2031,7 +2036,11 @@ static int __init init_dlv(void)
 
         __gpio_as_func0(EARPHONE_DETE);
         __gpio_as_input(EARPHONE_DETE);
-		
+
+        __gpio_as_func0(AV_OUT_DETE);
+        __gpio_as_input(AV_OUT_DETE);
+
+
 	#if 0
         __gpio_enable_pull(EARPHONE_DETE);
 		if(__gpio_get_pin(EARPHONE_DETE) != 0)
@@ -2044,8 +2053,14 @@ static int __init init_dlv(void)
         	__gpio_as_irq_low_level(EARPHONE_DETE);
         else
         	__gpio_as_irq_high_level(EARPHONE_DETE);
+
+		__gpio_disable_pull(AV_OUT_DETE);
+        if(__gpio_get_pin(AV_OUT_DETE) != 0)
+        	__gpio_as_irq_low_level(AV_OUT_DETE);
+        else
+        	__gpio_as_irq_high_level(AV_OUT_DETE);
 	#endif
-	
+
         int ret;
         ret = request_irq(EARPHONE_DETE_IRQ, hp_pnp_irq,
             IRQF_DISABLED, "hp_pnp", NULL);
@@ -2071,5 +2086,3 @@ static void __exit cleanup_dlv(void)
 
 module_init(init_dlv);
 module_exit(cleanup_dlv);
-
-

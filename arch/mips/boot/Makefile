@@ -49,7 +49,7 @@ uImage: $(VMLINUX) vmlinux.bin
 	rm -f $(obj)/vmlinux.bin.gz
 	gzip -9 $(obj)/vmlinux.bin
 	mkimage -A mips -O linux -T kernel -C gzip \
-		-a $(LOADADDR) -e $(shell sh ./$(obj)/tools/entry $(NM) $(VMLINUX) ) \
+		-a $(LOADADDR) -e $(shell sh $(KBUILD_SRC)/$(obj)/tools/entry $(NM) $(VMLINUX) ) \
 		-n 'Linux-$(KERNELRELEASE)' \
 		-d $(obj)/vmlinux.bin.gz $(obj)/uImage
 	@echo '  Kernel: arch/mips/boot/$@ is ready'

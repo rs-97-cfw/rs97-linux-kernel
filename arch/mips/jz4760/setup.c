@@ -55,7 +55,12 @@ extern void jz_restart(char *);
 extern void jz_halt(void);
 extern void jz_power_off(void);
 extern void jz_time_init(void);
+
+#ifdef CONFIG_PM
 extern void jz_pm_hibernate(void);
+#else
+#define jz_pm_hibernate NULL
+#endif
 
 static void __init sysclocks_setup(void)
 {

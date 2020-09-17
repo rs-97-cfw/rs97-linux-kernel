@@ -142,7 +142,6 @@ static void jz_set_alarm(void)
 #if 0
 	if(rtc_rtcsar <= rtc_rtcsr) {
 #endif
-		printk("1\n");
 		rtc_write_reg(RTC_RTCSAR,rtc_rtcsr + ALARM_TIME);
 		rtc_set_reg(RTC_RTCCR,0x3<<2); /* alarm enable, alarm interrupt enable */
 //		alarm_state = 1;	       /* alarm on */
@@ -165,7 +164,8 @@ static void jz_set_alarm(void)
 	rtc_rtcsar = rtc_read_reg(RTC_RTCSAR); /* second alarm register */
 	rtc_rtcsr = rtc_read_reg(RTC_RTCSR); /* second register */
 
-	printk("rtc_rtcsar = %u rtc_rtcsr = %u alarm_state = %d\n", rtc_rtcsar, rtc_rtcsr, alarm_state);
+	// printk("rtc_rtcsar=%u; rtc_rtcsr=%u; alarm_state=%d\n", rtc_rtcsar, rtc_rtcsr, alarm_state);
+	printk("Suspend: on\n");
 }
 #undef ALARM_TIME
 #endif
@@ -294,7 +294,6 @@ static int jz_pm_do_sleep(void)
 		".set\tmips0");
 #endif
 
-
 	/*if power down p0 ,return from sleep.S*/
 
 	/* Restore to IDLE mode */
@@ -325,7 +324,7 @@ static int jz_pm_do_sleep(void)
 
 	CLRREG32(CPM_RSR, RSR_PR | RSR_WR | RSR_P0R);
 
-	printk("===>Leave CPU Sleep\n");
+	printk("Suspend: off\n");
 #if  defined(CONFIG_RTC_JZ4760) && defined(CONFIG_BATTERY_JZ)
 	if((INREG32(RTC_RTCCR) & RTCCR_AF)) {
 		rtc_clr_reg(RTC_RTCCR,RTCCR_AF | RTCCR_AE | RTCCR_AIE);
@@ -343,6 +342,9 @@ static int jz_pm_do_sleep(void)
 #if defined(CONFIG_RTC_JZ4760) && defined(CONFIG_BATTERY_JZ)
 	jz_restore_alarm();
 #endif
+
+	mdelay(50);
+	while(!__gpio_get_pin(GPIO_POWER_ON) || __gpio_get_pin(UMIDO_KEY_START));
 
 	return 0;
 }
